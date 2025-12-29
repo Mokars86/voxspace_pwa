@@ -19,8 +19,10 @@ import DiscoverView from '../components/DiscoverView';
 import ProfileView from '../components/ProfileView';
 import WalletView from '../components/WalletView';
 import CreateModal from '../components/CreateModal';
+import { useLanguage } from '../context/LanguageContext';
 
 const MainApp: React.FC = () => {
+    const { t } = useLanguage();
     const [activeTab, setActiveTab] = useState<TabType>('feed');
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [showNotifications, setShowNotifications] = useState(false);
@@ -51,15 +53,15 @@ const MainApp: React.FC = () => {
                 </div>
 
                 <div className="flex-1 px-4 space-y-2 mt-4">
-                    <NavButtonDesktop active={activeTab === 'feed'} onClick={() => setActiveTab('feed')} icon={<Rss size={24} />} label="Feed" />
-                    <NavButtonDesktop active={activeTab === 'chats'} onClick={() => setActiveTab('chats')} icon={<MessageCircle size={24} />} label="Chats" />
-                    <NavButtonDesktop active={activeTab === 'spaces'} onClick={() => setActiveTab('spaces')} icon={<Users size={24} />} label="Spaces" />
-                    <NavButtonDesktop active={activeTab === 'discover'} onClick={() => setActiveTab('discover')} icon={<Search size={24} />} label="Discover" />
-                    <NavButtonDesktop active={activeTab === 'profile'} onClick={() => setActiveTab('profile')} icon={<User size={24} />} label="Profile" />
+                    <NavButtonDesktop active={activeTab === 'feed'} onClick={() => setActiveTab('feed')} icon={<Rss size={24} />} label={t('nav.feed')} />
+                    <NavButtonDesktop active={activeTab === 'chats'} onClick={() => setActiveTab('chats')} icon={<MessageCircle size={24} />} label={t('nav.chats')} />
+                    <NavButtonDesktop active={activeTab === 'spaces'} onClick={() => setActiveTab('spaces')} icon={<Users size={24} />} label={t('nav.spaces')} />
+                    <NavButtonDesktop active={activeTab === 'discover'} onClick={() => setActiveTab('discover')} icon={<Search size={24} />} label={t('nav.discover')} />
+                    <NavButtonDesktop active={activeTab === 'profile'} onClick={() => setActiveTab('profile')} icon={<User size={24} />} label={t('nav.profile')} />
                 </div>
 
                 <div className="px-4">
-                    <NavButtonDesktop active={activeTab === 'wallet'} onClick={() => setActiveTab('wallet')} icon={<Wallet size={24} />} label="Wallet" />
+                    <NavButtonDesktop active={activeTab === 'wallet'} onClick={() => setActiveTab('wallet')} icon={<Wallet size={24} />} label={t('nav.wallet')} />
                 </div>
             </aside>
 
@@ -99,11 +101,11 @@ const MainApp: React.FC = () => {
 
                 {/* Mobile Bottom Nav */}
                 <nav className="md:hidden flex items-center justify-around py-3 border-t border-gray-100 dark:border-gray-800 bg-white/90 dark:bg-gray-900/90 backdrop-blur-md safe-bottom sticky bottom-0 z-10 w-full">
-                    <NavButton active={activeTab === 'chats'} onClick={() => setActiveTab('chats')} icon={<MessageCircle size={24} />} label="Chats" />
-                    <NavButton active={activeTab === 'feed'} onClick={() => setActiveTab('feed')} icon={<Rss size={24} />} label="Feed" />
-                    <NavButton active={activeTab === 'spaces'} onClick={() => setActiveTab('spaces')} icon={<Users size={24} />} label="Spaces" />
-                    <NavButton active={activeTab === 'discover'} onClick={() => setActiveTab('discover')} icon={<Search size={24} />} label="Discover" />
-                    <NavButton active={activeTab === 'profile'} onClick={() => setActiveTab('profile')} icon={<User size={24} />} label="Profile" />
+                    <NavButton active={activeTab === 'chats'} onClick={() => setActiveTab('chats')} icon={<MessageCircle size={24} />} label={t('nav.chats')} />
+                    <NavButton active={activeTab === 'feed'} onClick={() => setActiveTab('feed')} icon={<Rss size={24} />} label={t('nav.feed')} />
+                    <NavButton active={activeTab === 'spaces'} onClick={() => setActiveTab('spaces')} icon={<Users size={24} />} label={t('nav.spaces')} />
+                    <NavButton active={activeTab === 'discover'} onClick={() => setActiveTab('discover')} icon={<Search size={24} />} label={t('nav.discover')} />
+                    <NavButton active={activeTab === 'profile'} onClick={() => setActiveTab('profile')} icon={<User size={24} />} label={t('nav.profile')} />
                 </nav>
             </div>
 
@@ -190,8 +192,8 @@ const NavButtonDesktop: React.FC<NavButtonProps> = ({ active, onClick, icon, lab
     <button
         onClick={onClick}
         className={`flex items-center gap-4 w-full p-3 rounded-xl transition-all ${active
-                ? 'bg-red-50 dark:bg-red-900/10 text-[#ff1744] font-bold'
-                : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+            ? 'bg-red-50 dark:bg-red-900/10 text-[#ff1744] font-bold'
+            : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
             }`}
     >
         {icon}

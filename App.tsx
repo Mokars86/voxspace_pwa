@@ -41,102 +41,107 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
+import { LanguageProvider } from './context/LanguageContext';
+
 const App: React.FC = () => {
   return (
-    <Routes>
-      <Route path="/welcome" element={<Welcome />} />
-      <Route path="/login" element={<Login />} />
+    <LanguageProvider>
+      <Routes>
+        <Route path="/welcome" element={<Welcome />} />
+        <Route path="/login" element={<Login />} />
 
-      <Route
-        path="/chat/:id"
-        element={
-          <ProtectedRoute>
-            <ChatRoom />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/settings"
-        element={
-          <ProtectedRoute>
-            <Settings />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/settings/notifications"
-        element={
-          <ProtectedRoute>
-            <NotificationSettings />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/settings/privacy"
-        element={
-          <ProtectedRoute>
-            <PrivacySettings />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/settings/security"
-        element={
-          <ProtectedRoute>
-            <SecuritySettings />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/settings/appearance"
-        element={
-          <ProtectedRoute>
-            <AppearanceSettings />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/edit-profile"
-        element={
-          <ProtectedRoute>
-            <EditProfile />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/space/:id"
-        element={
-          <ProtectedRoute>
-            <SpaceDetail />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/space/:id/chat"
-        element={
-          <ProtectedRoute>
-            <SpaceChatRoom />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/user/:id"
-        element={
-          <ProtectedRoute>
-            <UserProfile />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/*"
-        element={
-          <ProtectedRoute>
-            <MainApp />
-          </ProtectedRoute>
-        }
-      />
-    </Routes>
+        <Route
+          path="/chat/:id"
+          element={
+            <ProtectedRoute>
+              <ChatRoom />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/settings"
+          element={
+            <ProtectedRoute>
+              <Settings />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/settings/notifications"
+          element={
+            <ProtectedRoute>
+              <NotificationSettings />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/settings/privacy"
+          element={
+            <ProtectedRoute>
+              <PrivacySettings />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/settings/security"
+          element={
+            <ProtectedRoute>
+              <SecuritySettings />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/settings/appearance"
+          element={
+            <ProtectedRoute>
+              <AppearanceSettings />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/edit-profile"
+          element={
+            <ProtectedRoute>
+              <EditProfile />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/space/:id"
+          element={
+            <ProtectedRoute>
+              <SpaceDetail />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/space/:id/chat"
+          element={
+            <ProtectedRoute>
+              <SpaceChatRoom />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/user/:id"
+          element={
+            <ProtectedRoute>
+              <UserProfile />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/*"
+          element={
+            <ProtectedRoute>
+              <MainApp />
+            </ProtectedRoute>
+          }
+        />
+      </Routes>
+    </LanguageProvider>
   );
 };
+
 
 export default App;

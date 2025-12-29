@@ -1,11 +1,16 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, User, Shield, Bell, Moon, Globe, Database, Lock, LogOut, ChevronRight } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { supabase } from '../services/supabase';
+import { useLanguage } from '../context/LanguageContext';
+import LanguageModal from '../components/LanguageModal';
 
 const Settings: React.FC = () => {
     const navigate = useNavigate();
     const { signOut } = useAuth();
+    const { language, setLanguage, t } = useLanguage();
+    const [showLangModal, setShowLangModal] = useState(false);
 
     const handleLogout = async () => {
         await signOut();
@@ -18,7 +23,7 @@ const Settings: React.FC = () => {
                 <button onClick={() => navigate(-1)} className="text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 p-2 rounded-full">
                     <ArrowLeft size={24} />
                 </button>
-                <h1 className="text-xl font-bold dark:text-white">Settings</h1>
+                <h1 className="text-xl font-bold dark:text-white">{t('headers.settings')}</h1>
             </header>
 
             <div className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-950">
@@ -38,12 +43,14 @@ const Settings: React.FC = () => {
 
                     <SettingsSection title="Preferences">
                         <div onClick={() => navigate('/settings/notifications')}>
-                            <SettingsItem icon={<Bell size={20} />} label="Notifications" />
+                            <SettingsItem icon={<Bell size={20} />} label={t('headers.notifications')} />
                         </div>
                         <div onClick={() => navigate('/settings/appearance')}>
                             <SettingsItem icon={<Moon size={20} />} label="Appearance" value="Mode" />
                         </div>
-                        <SettingsItem icon={<Globe size={20} />} label="Language" value="English" />
+                        <div onClick={() => setShowLangModal(true)}>
+                            <SettingsItem icon={<Globe size={20} />} label="Language" value={language} />
+                        </div>
                     </SettingsSection>
 
                     <SettingsSection title="Data">
@@ -63,6 +70,14 @@ const Settings: React.FC = () => {
                     </p>
                 </div>
             </div>
+
+            {showLangModal && (
+                <LanguageModal
+                    onClose={() => setShowLangModal(false)}
+                    currentLanguage={language}
+                    onUpdate={(lang) => setLanguage(lang)}
+                />
+            )}
         </div>
     );
 };
