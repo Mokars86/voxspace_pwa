@@ -18,6 +18,7 @@ export interface ChatMessage {
         sender: string;
     };
     isDeleted?: boolean;
+    isEdited?: boolean;
 }
 
 export interface MessageProps {
@@ -25,11 +26,18 @@ export interface MessageProps {
     onSwipeReply?: (msg: any) => void;
     onReact?: (msgId: string, reaction: string) => void;
     onLongPress?: (msg: any) => void;
+    onEdit?: (msgId: string, newText: string) => void;
+    onDelete?: (msgId: string) => void;
+    onForward?: (msg: any) => void;
+    onMediaClick?: (url: string) => void;
 }
 
-const MessageBubble: React.FC<MessageProps> = ({ message, onSwipeReply, onReact, onLongPress }) => {
+const MessageBubble: React.FC<MessageProps> = ({ message, onSwipeReply, onReact, onLongPress, onEdit, onDelete, onForward, onMediaClick }) => {
     const isMe = message.sender === 'me';
     const [isPlaying, setIsPlaying] = React.useState(false);
+    const [showMenu, setShowMenu] = React.useState(false);
+    const [isEditing, setIsEditing] = React.useState(false);
+    const [editText, setEditText] = React.useState(message.text);
 
     if (message.isDeleted) {
         return (
@@ -41,11 +49,42 @@ const MessageBubble: React.FC<MessageProps> = ({ message, onSwipeReply, onReact,
         );
     }
 
+    const handleSaveEdit = () => {
+        if (onEdit && editText !== message.text) {
+            onEdit(message.id, editText);
+        }
+        setIsEditing(false);
+        setShowMenu(false);
+    };
+
     return (
         <div
-            className={cn("flex w-full mb-2 group", isMe ? "justify-end" : "justify-start")}
+            className={cn("flex w-full mb-2 group relative", isMe ? "justify-end" : "justify-start")}
             onDoubleClick={() => onReact && onReact(message.id, '❤️')}
+            onContextMenu={(e) => {
+                e.preventDefault();
+                setShowMenu(true);
+            }}
         >
+            {/* Context Menu */}
+            {showMenu && (
+                <>
+                    <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)} />
+                    <div className={cn(
+                        "absolute top-8 z-50 bg-white rounded-xl shadow-xl w-32 py-2 overflow-hidden border border-gray-100 animate-in fade-in zoom-in duration-200 origin-top-left",
+                        isMe ? "right-0" : "left-0"
+                    )}>
+                        {isMe && message.type === 'text' && (
+                            <button onClick={() => setIsEditing(true)} className="w-full text-left px-4 py-2 hover:bg-gray-50 text-sm font-medium">Edit</button>
+                        )}
+                        <button onClick={() => { onForward && onForward(message); setShowMenu(false); }} className="w-full text-left px-4 py-2 hover:bg-gray-50 text-sm font-medium">Forward</button>
+                        {isMe && (
+                            <button onClick={() => { onDelete && onDelete(message.id); setShowMenu(false); }} className="w-full text-left px-4 py-2 hover:bg-red-50 text-red-500 text-sm font-medium">Delete</button>
+                        )}
+                    </div>
+                </>
+            )}
+
             <div className={cn(
                 "relative max-w-[75%] rounded-2xl shadow-sm transition-all",
                 isMe
@@ -66,7 +105,13 @@ const MessageBubble: React.FC<MessageProps> = ({ message, onSwipeReply, onReact,
                 <div className="px-3 py-2">
                     {/* Media: Image */}
                     {message.type === 'image' && message.mediaUrl && (
-                        <div className="mb-1 overflow-hidden rounded-lg">
+                        <div
+                            className="mb-1 overflow-hidden rounded-lg cursor-pointer hover:opacity-95 transition-opacity"
+                            onClick={(e) => {
+                                e.stopPropagation(); // Prevent message bubble click/long-press interactions if any
+                                onMediaClick && onMediaClick(message.mediaUrl!);
+                            }}
+                        >
                             <img src={message.mediaUrl} alt="Shared" className="w-full h-auto max-h-[300px] object-cover" />
                         </div>
                     )}
@@ -134,9 +179,25 @@ const MessageBubble: React.FC<MessageProps> = ({ message, onSwipeReply, onReact,
 
                     {/* Text Content */}
                     {message.type === 'text' && (
-                        <p className="text-[15px] leading-relaxed break-words whitespace-pre-wrap">
-                            {message.text}
-                        </p>
+                        isEditing ? (
+                            <div className="flex flex-col gap-2 min-w-[200px]">
+                                <input
+                                    value={editText}
+                                    onChange={(e) => setEditText(e.target.value)}
+                                    className="bg-white/20 text-white rounded p-1 outline-none border border-white/30"
+                                    autoFocus
+                                />
+                                <div className="flex justify-end gap-2 text-xs font-bold">
+                                    <button onClick={() => setIsEditing(false)}>Cancel</button>
+                                    <button onClick={handleSaveEdit} className="bg-white text-[#ff1744] px-2 py-1 rounded">Save</button>
+                                </div>
+                            </div>
+                        ) : (
+                            <p className="text-[15px] leading-relaxed break-words whitespace-pre-wrap">
+                                {message.text}
+                                {message.isEdited && <span className="text-[10px] opacity-60 ml-1">(edited)</span>}
+                            </p>
+                        )
                     )}
 
                     {/* Buzz Content */}

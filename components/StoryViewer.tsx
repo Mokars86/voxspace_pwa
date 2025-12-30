@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Heart, Send, Eye, Mic } from 'lucide-react';
+import { X, Heart, Send, Eye, Mic, Trash2 } from 'lucide-react';
 import { Story } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../services/supabase';
@@ -165,12 +165,38 @@ const StoryViewer: React.FC<StoryViewerProps> = ({ stories, initialIndex, onClos
         }
     };
 
+    const handleDelete = async () => {
+        if (!currentStory || !user) return;
+        if (!window.confirm("Are you sure you want to delete this story?")) return;
+        setIsPaused(true);
+
+        try {
+            const { error } = await supabase.from('stories').delete().eq('id', currentStory.id);
+            if (error) throw error;
+
+            // Move to next or close
+            if (stories.length > 1) {
+                // Remove from local list if we could (but props are immutable, so just close/next)
+                // In a perfect world we'd update parent state, but for now just force close or next
+                handleNext();
+                // A full refresh would be better, but we close for safety/simplicity to trigger re-fetch in parent
+                onClose();
+            } else {
+                onClose();
+            }
+        } catch (error) {
+            console.error("Error deleting story:", error);
+            alert("Failed to delete story");
+            setIsPaused(false);
+        }
+    };
+
     if (!currentStory) return null;
 
     return (
-        <div className="fixed inset-0 z-50 bg-black flex flex-col">
+        <div className="fixed top-0 left-0 w-full h-[100dvh] z-[60] bg-black flex flex-col">
             {/* Progress Bar */}
-            <div className="absolute top-0 left-0 right-0 p-2 z-10 flex gap-1">
+            <div className="absolute top-2 left-0 right-0 p-2 z-60 flex gap-1 safe-top">
                 {stories.map((_, idx) => (
                     <div key={idx} className="h-1 flex-1 bg-white/30 rounded-full overflow-hidden">
                         <div
@@ -183,26 +209,42 @@ const StoryViewer: React.FC<StoryViewerProps> = ({ stories, initialIndex, onClos
             </div>
 
             {/* Header */}
-            <div className="absolute top-4 left-0 right-0 p-4 z-10 flex justify-between items-center text-white mt-4">
-                <div className="flex items-center gap-3">
+            <div className="absolute top-0 left-0 right-0 p-4 pt-12 z-50 flex justify-between items-center text-white mt-0 pointer-events-none bg-gradient-to-b from-black/60 to-transparent">
+                <div className="flex items-center gap-3 pointer-events-auto">
                     <img
                         src={currentStory.user?.avatar_url || `https://ui-avatars.com/api/?name=${currentStory.user?.username}`}
                         className="w-10 h-10 rounded-full border border-white/20"
                         alt="User"
                     />
-                    <span className="font-bold text-shadow">{currentStory.user?.username}</span>
-                    <span className="text-white/70 text-sm">{new Date(currentStory.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                </div>
-                {/* View Count (Owner Only) */}
-                {user?.id === currentStory.user_id && (
-                    <div className="flex items-center gap-1 bg-black/40 px-3 py-1 rounded-full backdrop-blur-md">
-                        <Eye size={14} className="text-white" />
-                        <span className="text-xs font-bold text-white">{currentStory.views_count || 0}</span>
+                    <div className="flex flex-col">
+                        <span className="font-bold text-shadow leading-none">{currentStory.user?.username}</span>
+                        <span className="text-white/70 text-xs">{new Date(currentStory.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                     </div>
-                )}
-                <button onClick={onClose}>
-                    <X size={28} />
-                </button>
+                </div>
+
+                <div className="flex items-center gap-2 pointer-events-auto">
+                    {/* View Count (Owner Only) */}
+                    {user?.id === currentStory.user_id && (
+                        <div className="flex items-center gap-1 bg-black/40 px-3 py-1 rounded-full backdrop-blur-md">
+                            <Eye size={14} className="text-white" />
+                            <span className="text-xs font-bold text-white">{currentStory.views_count || 0}</span>
+                        </div>
+                    )}
+                    {user?.id === currentStory.user_id && (
+                        <button
+                            onClick={(e) => { e.stopPropagation(); handleDelete(); }}
+                            className="p-2 bg-black/20 hover:bg-black/40 rounded-full transition-colors backdrop-blur-md"
+                        >
+                            <Trash2 size={24} className="text-white hover:text-red-500" />
+                        </button>
+                    )}
+                    <button
+                        onClick={(e) => { e.stopPropagation(); onClose(); }}
+                        className="p-2 bg-black/20 hover:bg-black/40 rounded-full transition-colors backdrop-blur-md"
+                    >
+                        <X size={28} />
+                    </button>
+                </div>
             </div>
 
             {/* Content */}

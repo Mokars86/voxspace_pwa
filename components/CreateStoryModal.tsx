@@ -182,9 +182,9 @@ const CreateStoryModal: React.FC<CreateStoryModalProps> = ({ onClose, onSuccess 
                 <X size={24} />
             </button>
 
-            <div className="w-full max-w-md bg-white dark:bg-gray-900 rounded-2xl overflow-hidden shadow-2xl">
+            <div className="w-full max-w-md bg-white dark:bg-gray-900 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90dvh]">
                 {mode === 'select' && (
-                    <div className="p-8 flex flex-col gap-4">
+                    <div className="p-8 flex flex-col gap-4 overflow-y-auto">
                         <h2 className="text-2xl font-bold text-center mb-4 dark:text-white">Add to Story</h2>
                         <button
                             onClick={() => fileInputRef.current?.click()}
