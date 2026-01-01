@@ -6,12 +6,6 @@ import { useTheme } from '../../context/ThemeContext';
 const AppearanceSettings: React.FC = () => {
     const navigate = useNavigate();
     const { theme, setTheme } = useTheme();
-    const [selectedTheme, setSelectedTheme] = React.useState(theme);
-
-    const handleApply = () => {
-        setTheme(selectedTheme);
-        navigate(-1); // Optional: go back after applying, or stay. Staying is usually better for "Apply". Let's stay or give feedback? User didn't specify. Standard is just apply.
-    };
 
     return (
         <div className="flex flex-col h-screen bg-white dark:bg-gray-900 dark:text-gray-100 transition-colors duration-300">
@@ -29,25 +23,20 @@ const AppearanceSettings: React.FC = () => {
                         <ThemeCard
                             icon={<Sun size={24} />}
                             label="Light Mode"
-                            selected={selectedTheme === 'light'}
-                            onClick={() => setSelectedTheme('light')}
+                            selected={theme === 'light'}
+                            onClick={() => setTheme('light')}
                         />
                         <ThemeCard
                             icon={<Moon size={24} />}
                             label="Dark Mode"
-                            selected={selectedTheme === 'dark'}
-                            onClick={() => setSelectedTheme('dark')}
+                            selected={theme === 'dark'}
+                            onClick={() => setTheme('dark')}
                         />
                     </div>
                 </section>
 
-                <div className="pt-4">
-                    <button
-                        onClick={handleApply}
-                        className="w-full py-4 bg-[#ff1744] text-white font-bold rounded-2xl shadow-lg active:scale-95 transition-transform"
-                    >
-                        Apply Theme
-                    </button>
+                <div className="pt-8 px-4 text-center text-sm text-gray-400">
+                    <p>Changes are saved automatically.</p>
                 </div>
             </div>
         </div>

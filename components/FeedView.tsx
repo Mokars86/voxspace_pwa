@@ -6,9 +6,11 @@ import { Post } from '../types';
 import { cn } from '../lib/utils';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 
 const FeedView: React.FC = () => {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState<'foryou' | 'following'>('foryou');
   const [posts, setPosts] = useState<Post[]>([]);
   const [followedUsers, setFollowedUsers] = useState<any[]>([]);
@@ -23,6 +25,8 @@ const FeedView: React.FC = () => {
             id,
             content,
             media_url,
+            media_type,
+            location,
             created_at,
             likes_count,
             comments_count,
@@ -98,6 +102,8 @@ const FeedView: React.FC = () => {
         comments: item.comments_count || 0,
         reposts: item.reposts_count || 0,
         media: item.media_url,
+        media_type: item.media_type,
+        location: item.location,
         isLiked: user ? item.post_likes?.some((l: any) => l.user_id === user.id) : false
       }));
 
@@ -133,7 +139,7 @@ const FeedView: React.FC = () => {
           className="flex-1 py-3 text-center relative"
         >
           <span className={cn("font-bold text-[15px]", activeTab === 'foryou' ? "text-gray-900 dark:text-white" : "text-gray-500 dark:text-gray-400")}>
-            For you
+            {t('feed.tabs.foryou')}
           </span>
           {activeTab === 'foryou' && (
             <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-14 h-1 bg-[#ff1744] rounded-full" />
@@ -144,7 +150,7 @@ const FeedView: React.FC = () => {
           className="flex-1 py-3 text-center relative"
         >
           <span className={cn("font-bold text-[15px]", activeTab === 'following' ? "text-gray-900 dark:text-white" : "text-gray-500 dark:text-gray-400")}>
-            Following
+            {t('feed.tabs.following')}
           </span>
           {activeTab === 'following' && (
             <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-14 h-1 bg-[#ff1744] rounded-full" />
@@ -190,7 +196,7 @@ const FeedView: React.FC = () => {
           <div className="flex-1">
             <input
               type="text"
-              placeholder="What's happening?"
+              placeholder={t('feed.placeholder')}
               className="w-full py-2 bg-transparent outline-none text-lg placeholder:text-gray-500 dark:text-white dark:placeholder:text-gray-400"
             />
             <div className="flex items-center gap-4 mt-2 text-[#ff1744]">
@@ -216,9 +222,9 @@ const FeedView: React.FC = () => {
             <div className="p-8 text-center text-gray-500">
               {activeTab === 'following'
                 ? (followedUsers.length > 0
-                  ? <p>The people you follow haven't posted yet.</p>
-                  : <p>You aren't following anyone yet.</p>)
-                : <p>No posts yet. be the first!</p>
+                  ? <p>{t('feed.empty_following')}</p>
+                  : <p>{t('feed.empty_following_all')}</p>)
+                : <p>{t('feed.empty')}</p>
               }
             </div>
           )

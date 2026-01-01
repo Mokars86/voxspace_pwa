@@ -20,9 +20,13 @@ import ProfileView from '../components/ProfileView';
 import WalletView from '../components/WalletView';
 import CreateModal from '../components/CreateModal';
 import { useLanguage } from '../context/LanguageContext';
+import { useNotifications } from '../context/NotificationContext';
+import { useNavigate } from 'react-router-dom';
 
 const MainApp: React.FC = () => {
     const { t } = useLanguage();
+    const { unreadCount, notifications, markAsRead, markAllAsRead } = useNotifications();
+    const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState<TabType>('feed');
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [showNotifications, setShowNotifications] = useState(false);
@@ -89,7 +93,9 @@ const MainApp: React.FC = () => {
                             className="p-1.5 rounded-full text-gray-600 dark:text-gray-400 relative"
                         >
                             <Bell size={22} />
-                            <span className="absolute top-1 right-1 w-2 h-2 bg-[#ff1744] rounded-full"></span>
+                            {unreadCount > 0 && (
+                                <span className="absolute top-1 right-1 w-2 h-2 bg-[#ff1744] rounded-full animate-pulse"></span>
+                            )}
                         </button>
                     </div>
                 </header>
@@ -112,7 +118,7 @@ const MainApp: React.FC = () => {
             {/* Desktop Right Sidebar (Widgets) - Optional, fills space */}
             <div className="hidden lg:block w-80 p-6 border-l border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-950 overflow-y-auto">
                 <div className="mb-6">
-                    <h3 className="font-bold text-gray-500 mb-4 uppercase text-xs tracking-wider">Suggested for you</h3>
+                    <h3 className="font-bold text-gray-500 mb-4 uppercase text-xs tracking-wider">{t('sidebar.suggested')}</h3>
                     {/* Placeholder Widgets */}
                     <div className="space-y-4">
                         {[1, 2, 3].map(i => (
@@ -128,9 +134,9 @@ const MainApp: React.FC = () => {
                 </div>
 
                 <div className="p-4 bg-gradient-to-br from-[#ff1744] to-pink-600 rounded-2xl text-white shadow-lg">
-                    <h3 className="font-bold text-lg mb-1">Go Premium</h3>
-                    <p className="text-sm text-white/90 mb-3">Unlock exclusive badges and features.</p>
-                    <button className="w-full py-2 bg-white text-[#ff1744] font-bold rounded-xl text-sm">Upgrade</button>
+                    <h3 className="font-bold text-lg mb-1">{t('sidebar.premium')}</h3>
+                    <p className="text-sm text-white/90 mb-3">{t('sidebar.premium_desc')}</p>
+                    <button className="w-full py-2 bg-white text-[#ff1744] font-bold rounded-xl text-sm">{t('sidebar.upgrade')}</button>
                 </div>
             </div>
 
@@ -152,18 +158,53 @@ const MainApp: React.FC = () => {
                             <button onClick={() => setShowNotifications(false)} className="dark:text-white"><X /></button>
                         </div>
                         <div className="flex-1 p-4 space-y-4 overflow-y-auto">
-                            {[1, 2, 3, 4, 5].map(i => (
-                                <div key={i} className="flex space-x-3 items-start border-b border-gray-50 dark:border-gray-800 pb-4">
-                                    <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center text-[#ff1744]">
-                                        <Bell size={18} />
+                            {notifications.length > 0 ? (
+                                notifications.map(notif => (
+                                    <div
+                                        key={notif.id}
+                                        onClick={() => {
+                                            markAsRead(notif.id);
+                                            if (notif.data?.chat_id) {
+                                                navigate(`/chat/${notif.data.chat_id}`);
+                                                setShowNotifications(false);
+                                            } else if (notif.type === 'like' || notif.type === 'follow') {
+                                                if (notif.actor_id) {
+                                                    navigate(`/user/${notif.actor_id}`);
+                                                    setShowNotifications(false);
+                                                }
+                                            }
+                                        }}
+                                        className={`flex space-x-3 items-start border-b border-gray-50 dark:border-gray-800 pb-4 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50 p-2 rounded-xl transition-colors ${!notif.is_read ? 'bg-red-50/50 dark:bg-red-900/10' : ''}`}
+                                    >
+                                        <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center text-[#ff1744] flex-shrink-0">
+                                            {notif.type === 'message' ? <MessageCircle size={18} /> :
+                                                notif.type === 'like' ? <Zap size={18} /> :
+                                                    notif.type === 'follow' ? <User size={18} /> :
+                                                        <Bell size={18} />}
+                                        </div>
+                                        <div>
+                                            <p className="text-sm dark:text-gray-200">
+                                                <span className="font-bold">{notif.title}</span> {notif.content}
+                                            </p>
+                                            <p className="text-xs text-gray-400 mt-1">{new Date(notif.created_at).toLocaleTimeString()} · {new Date(notif.created_at).toLocaleDateString()}</p>
+                                        </div>
+                                        {!notif.is_read && <div className="w-2 h-2 bg-[#ff1744] rounded-full mt-2" />}
                                     </div>
-                                    <div>
-                                        <p className="text-sm dark:text-gray-200"><span className="font-bold">Alex Johnson</span> liked your post about AI discovery.</p>
-                                        <p className="text-xs text-gray-400 mt-1">2 hours ago</p>
-                                    </div>
+                                ))
+                            ) : (
+                                <div className="text-center py-10 text-gray-400">
+                                    <Bell size={32} className="mx-auto mb-2 opacity-20" />
+                                    No notifications
                                 </div>
-                            ))}
+                            )}
                         </div>
+                        {notifications.length > 0 && unreadCount > 0 && (
+                            <div className="p-4 border-t dark:border-gray-800 sticky bottom-0 bg-white dark:bg-gray-900 rounded-b-2xl">
+                                <button onClick={markAllAsRead} className="w-full py-3 text-sm font-bold text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white">
+                                    Mark all as read
+                                </button>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, User, Shield, Bell, Moon, Globe, Database, Lock, LogOut, ChevronRight } from 'lucide-react';
+import { ArrowLeft, User, Shield, Bell, Moon, Globe, Database, Lock, LogOut, ChevronRight, Loader2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../services/supabase';
 import { useLanguage } from '../context/LanguageContext';
@@ -8,9 +8,23 @@ import LanguageModal from '../components/LanguageModal';
 
 const Settings: React.FC = () => {
     const navigate = useNavigate();
-    const { signOut } = useAuth();
+    const { signOut, deleteAccount } = useAuth();
     const { language, setLanguage, t } = useLanguage();
     const [showLangModal, setShowLangModal] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
+
+    const handleDeleteAccount = async () => {
+        if (window.confirm("Are you sure you want to delete your account? This action cannot be undone and you will lose all your data.")) {
+            setIsDeleting(true);
+            try {
+                await deleteAccount();
+                navigate('/welcome');
+            } catch (error) {
+                alert("Failed to delete account. Please try again.");
+                setIsDeleting(false);
+            }
+        }
+    };
 
     const handleLogout = async () => {
         await signOut();
@@ -63,6 +77,15 @@ const Settings: React.FC = () => {
                     >
                         <LogOut size={20} />
                         Log Out
+                    </button>
+
+                    <button
+                        onClick={handleDeleteAccount}
+                        disabled={isDeleting}
+                        className="w-full bg-white dark:bg-gray-900 p-4 rounded-2xl flex items-center gap-3 text-red-600 font-bold shadow-sm active:scale-[0.98] transition-all hover:bg-red-50 dark:hover:bg-red-900/10 mt-4"
+                    >
+                        {isDeleting ? <Loader2 className="animate-spin" size={20} /> : <LogOut size={20} />}
+                        {isDeleting ? "Deleting..." : "Delete Account"}
                     </button>
 
                     <p className="text-center text-xs text-gray-400 mt-4">

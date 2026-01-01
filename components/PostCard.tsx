@@ -1,9 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Heart, MessageCircle, Repeat, Share, MoreHorizontal, BadgeCheck, Trash2, Edit2, Send, X } from 'lucide-react';
+import { Heart, MessageCircle, Repeat, Share, MoreHorizontal, BadgeCheck, Trash2, Edit2, Send, X, Music, MapPin } from 'lucide-react';
 import { cn } from '../lib/utils';
-import { Post } from '../types';
+import { Post, Comment } from '../types';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../context/AuthContext';
 
@@ -12,6 +12,61 @@ interface PostCardProps {
     onDelete?: (id: string) => void;
     onPin?: (id: string) => void;
 }
+
+interface CommentItemProps {
+    comment: Comment;
+    depth?: number;
+    currentUserId?: string;
+    onDelete: (id: string) => void;
+    onReply: (id: string) => void;
+}
+
+const CommentItem: React.FC<CommentItemProps> = ({ comment, depth = 0, currentUserId, onDelete, onReply }) => (
+    <div className={`flex gap-3 group mt-4 ${depth > 0 ? 'ml-12 border-l-2 border-gray-100 dark:border-gray-800 pl-4' : ''}`}>
+        <img
+            src={comment.profiles?.avatar_url || `https://ui-avatars.com/api/?name=${comment.profiles?.full_name}`}
+            className="w-8 h-8 rounded-full object-cover border border-gray-100 dark:border-gray-700"
+            alt={comment.profiles?.full_name || 'User'}
+        />
+        <div className="flex-1">
+            <div className="bg-gray-50 dark:bg-gray-800 rounded-2xl p-3 px-4 relative">
+                <div className="flex justify-between items-start">
+                    <span className="font-bold text-sm text-gray-900 dark:text-gray-100">{comment.profiles?.full_name}</span>
+                    {currentUserId && currentUserId === comment.user_id && (
+                        <button
+                            onClick={() => onDelete(comment.id)}
+                            className="text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                            <X size={14} />
+                        </button>
+                    )}
+                </div>
+                <p className="text-sm text-gray-700 dark:text-gray-300 mt-0.5">{comment.content}</p>
+            </div>
+            <div className="flex items-center gap-4 mt-1 ml-2">
+                <span className="text-xs text-gray-400">{new Date(comment.created_at).toLocaleDateString()}</span>
+                <button className="text-xs font-bold text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200">Like</button>
+                <button
+                    onClick={() => onReply(comment.id)}
+                    className="text-xs font-bold text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
+                >
+                    Reply
+                </button>
+            </div>
+            {/* Render Children */}
+            {comment.children && comment.children.map((child: Comment) => (
+                <CommentItem
+                    key={child.id}
+                    comment={child}
+                    depth={depth + 1}
+                    currentUserId={currentUserId}
+                    onDelete={onDelete}
+                    onReply={onReply}
+                />
+            ))}
+        </div>
+    </div>
+);
 
 const PostCard: React.FC<PostCardProps> = ({ post, onDelete, onPin }) => {
     const navigate = useNavigate();
@@ -26,8 +81,9 @@ const PostCard: React.FC<PostCardProps> = ({ post, onDelete, onPin }) => {
 
     // Comments
     const [showComments, setShowComments] = useState(false);
-    const [comments, setComments] = useState<any[]>([]);
+    const [comments, setComments] = useState<Comment[]>([]);
     const [newComment, setNewComment] = useState('');
+    const [replyingTo, setReplyingTo] = useState<string | null>(null);
     const [commentCount, setCommentCount] = useState(post.comments);
 
     // Check if current user is author (needs author ID in post type ideally, inferring from username for now or needs update)
@@ -105,7 +161,12 @@ const PostCard: React.FC<PostCardProps> = ({ post, onDelete, onPin }) => {
         try {
             const { data, error } = await supabase
                 .from('comments')
-                .insert({ post_id: post.id, user_id: user.id, content: newComment.trim() })
+                .insert({
+                    post_id: post.id,
+                    user_id: user.id,
+                    content: newComment.trim(),
+                    parent_id: replyingTo
+                })
                 .select('*, profiles(full_name, avatar_url, username)')
                 .single();
 
@@ -113,6 +174,7 @@ const PostCard: React.FC<PostCardProps> = ({ post, onDelete, onPin }) => {
 
             setComments([...comments, data]);
             setNewComment('');
+            setReplyingTo(null);
             setCommentCount(prev => prev + 1);
         } catch (error) {
             console.error("Error posting comment:", error);
@@ -129,6 +191,35 @@ const PostCard: React.FC<PostCardProps> = ({ post, onDelete, onPin }) => {
             console.error("Error deleting comment:", error);
         }
     };
+
+    // Helper to organize comments into threads (simple 1-level nesting for view or just flat with indentation)
+    // For simplicity in this iteration, we'll render flat but check parent_id for indentation
+    // A better approach is a recursive component, but let's do a simple sort first.
+    // Actually, flat list with indentation is easier if we sort by thread. 
+    // But since we just got list by created_at, a simple map with logic or a Tree build is needed.
+    // Let's do a simple Tree build.
+
+    const buildCommentTree = (flatComments: Comment[]) => {
+        const roots: Comment[] = [];
+        const map: Record<string, Comment> = {};
+
+        flatComments.forEach(c => {
+            map[c.id] = { ...c, children: [] };
+        });
+
+        flatComments.forEach(c => {
+            if (c.parent_id && map[c.parent_id]) {
+                map[c.parent_id].children = map[c.parent_id].children || [];
+                map[c.parent_id].children!.push(map[c.id]);
+            } else {
+                roots.push(map[c.id]);
+            }
+        });
+
+        return roots;
+    };
+
+
 
     return (
         <article className="p-4 border-b border-gray-50 dark:border-gray-800 bg-white dark:bg-gray-900 hover:bg-gray-50/30 dark:hover:bg-gray-800/30 transition-colors">
@@ -194,6 +285,16 @@ const PostCard: React.FC<PostCardProps> = ({ post, onDelete, onPin }) => {
                         )}
                     </div>
 
+                    {/* Location Badge */}
+                    {post.location && (
+                        <div className="inline-flex items-center gap-1 text-[#ff1744] bg-red-50 dark:bg-red-900/20 px-2 py-0.5 rounded-lg text-xs mt-1">
+                            <MapPin size={12} />
+                            <span>{post.location.name}</span>
+                        </div>
+                    )}
+
+
+
                     {/* Content Area */}
                     {isEditing ? (
                         <div className="mt-2">
@@ -224,8 +325,19 @@ const PostCard: React.FC<PostCardProps> = ({ post, onDelete, onPin }) => {
                     )}
 
                     {post.media && !isEditing && (
-                        <div className="mt-3 rounded-2xl overflow-hidden border border-gray-100 shadow-sm">
-                            <img src={post.media} alt="Post content" className="w-full h-auto max-h-[400px] object-cover" />
+                        <div className="mt-3 rounded-2xl overflow-hidden border border-gray-100 dark:border-gray-800 shadow-sm">
+                            {post.media_type === 'audio' ? (
+                                <div className="p-3 bg-gray-50 dark:bg-gray-800 flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center text-[#ff1744]">
+                                        <Music size={20} />
+                                    </div>
+                                    <audio controls src={post.media} className="flex-1 h-8" />
+                                </div>
+                            ) : post.media_type === 'video' ? (
+                                <video controls src={post.media} className="w-full h-auto max-h-[400px] object-cover bg-black" />
+                            ) : (
+                                <img src={post.media} alt="Post content" className="w-full h-auto max-h-[400px] object-cover bg-gray-100" />
+                            )}
                         </div>
                     )}
 
@@ -303,18 +415,24 @@ const PostCard: React.FC<PostCardProps> = ({ post, onDelete, onPin }) => {
                                     {user?.user_metadata?.avatar_url && <img src={user.user_metadata.avatar_url} className="w-full h-full object-cover" />}
                                 </div>
                                 <div className="flex-1 relative">
+                                    {replyingTo && (
+                                        <div className="flex items-center justify-between text-xs text-gray-500 mb-1 ml-2">
+                                            <span>Replying to comment...</span>
+                                            <button onClick={() => setReplyingTo(null)} className="hover:text-red-500"><X size={12} /></button>
+                                        </div>
+                                    )}
                                     <input
                                         type="text"
                                         value={newComment}
                                         onChange={(e) => setNewComment(e.target.value)}
-                                        placeholder="Post your reply"
+                                        placeholder={replyingTo ? "Write a reply..." : "Post your reply"}
                                         className="w-full pl-4 pr-10 py-2 bg-gray-50 dark:bg-gray-800 rounded-full text-sm outline-none focus:ring-1 focus:ring-[#ff1744] transition-all dark:text-white"
                                         onKeyDown={(e) => e.key === 'Enter' && handlePostComment()}
                                     />
                                     <button
                                         onClick={handlePostComment}
                                         disabled={!newComment.trim()}
-                                        className="absolute right-1 top-1 p-1.5 text-[#ff1744] hover:bg-red-50 dark:hover:bg-red-900/20 rounded-full disabled:opacity-50 disabled:cursor-not-allowed"
+                                        className="absolute right-1 bottom-1 p-1.5 text-[#ff1744] hover:bg-red-50 dark:hover:bg-red-900/20 rounded-full disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
                                         <Send size={16} />
                                     </button>
@@ -323,35 +441,19 @@ const PostCard: React.FC<PostCardProps> = ({ post, onDelete, onPin }) => {
 
                             {/* Comments List */}
                             <div className="space-y-4">
-                                {comments.map(comment => (
-                                    <div key={comment.id} className="flex gap-3 group">
-                                        <img
-                                            src={comment.profiles?.avatar_url || `https://ui-avatars.com/api/?name=${comment.profiles?.full_name}`}
-                                            className="w-8 h-8 rounded-full object-cover border border-gray-100 dark:border-gray-700"
+                                {comments.length > 0 ? (
+                                    buildCommentTree(comments).map(comment => (
+                                        <CommentItem
+                                            key={comment.id}
+                                            comment={comment}
+                                            currentUserId={user?.id}
+                                            onDelete={handleDeleteComment}
+                                            onReply={setReplyingTo}
                                         />
-                                        <div className="flex-1">
-                                            <div className="bg-gray-50 dark:bg-gray-800 rounded-2xl p-3 px-4 relative">
-                                                <div className="flex justify-between items-start">
-                                                    <span className="font-bold text-sm text-gray-900 dark:text-gray-100">{comment.profiles?.full_name}</span>
-                                                    {user && user.id === comment.user_id && (
-                                                        <button
-                                                            onClick={() => handleDeleteComment(comment.id)}
-                                                            className="text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                        >
-                                                            <X size={14} />
-                                                        </button>
-                                                    )}
-                                                </div>
-                                                <p className="text-sm text-gray-700 dark:text-gray-300 mt-0.5">{comment.content}</p>
-                                            </div>
-                                            <div className="flex items-center gap-4 mt-1 ml-2">
-                                                <span className="text-xs text-gray-400">{new Date(comment.created_at).toLocaleDateString()}</span>
-                                                <button className="text-xs font-bold text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200">Like</button>
-                                                <button className="text-xs font-bold text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200">Reply</button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                ))}
+                                    ))
+                                ) : (
+                                    <p className="text-center text-gray-400 text-sm py-2">No comments yet.</p>
+                                )}
                             </div>
                         </div>
                     )}

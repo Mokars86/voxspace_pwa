@@ -196,7 +196,7 @@ const StoryViewer: React.FC<StoryViewerProps> = ({ stories, initialIndex, onClos
     return (
         <div className="fixed top-0 left-0 w-full h-[100dvh] z-[60] bg-black flex flex-col">
             {/* Progress Bar */}
-            <div className="absolute top-2 left-0 right-0 p-2 z-60 flex gap-1 safe-top">
+            <div className="absolute top-0 left-0 right-0 p-2 z-[61] flex gap-1 safe-top mt-2">
                 {stories.map((_, idx) => (
                     <div key={idx} className="h-1 flex-1 bg-white/30 rounded-full overflow-hidden">
                         <div
@@ -209,7 +209,7 @@ const StoryViewer: React.FC<StoryViewerProps> = ({ stories, initialIndex, onClos
             </div>
 
             {/* Header */}
-            <div className="absolute top-0 left-0 right-0 p-4 pt-12 z-50 flex justify-between items-center text-white mt-0 pointer-events-none bg-gradient-to-b from-black/60 to-transparent">
+            <div className="absolute top-0 left-0 right-0 p-4 pt-[calc(3rem+env(safe-area-inset-top))] z-50 flex justify-between items-center text-white mt-0 pointer-events-none bg-gradient-to-b from-black/60 to-transparent">
                 <div className="flex items-center gap-3 pointer-events-auto">
                     <img
                         src={currentStory.user?.avatar_url || `https://ui-avatars.com/api/?name=${currentStory.user?.username}`}
@@ -217,7 +217,7 @@ const StoryViewer: React.FC<StoryViewerProps> = ({ stories, initialIndex, onClos
                         alt="User"
                     />
                     <div className="flex flex-col">
-                        <span className="font-bold text-shadow leading-none">{currentStory.user?.username}</span>
+                        <span className="font-bold text-shadow leading-none truncate max-w-[120px] sm:max-w-xs">{currentStory.user?.username}</span>
                         <span className="text-white/70 text-xs">{new Date(currentStory.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                     </div>
                 </div>
@@ -280,7 +280,7 @@ const StoryViewer: React.FC<StoryViewerProps> = ({ stories, initialIndex, onClos
                     </div>
                 ) : currentStory.type === 'poll' ? (
                     <div className="w-full h-full flex flex-col items-center justify-center p-8 bg-gradient-to-br from-yellow-400 to-orange-500 text-white">
-                        <h2 className="text-3xl font-bold text-center mb-8">{currentStory.content}</h2>
+                        <h2 className="text-2xl md:text-3xl font-bold text-center mb-8">{currentStory.content}</h2>
                         <div className="w-full max-w-sm space-y-4">
                             {currentStory.poll_options?.map((opt, idx) => (
                                 <button
@@ -299,13 +299,13 @@ const StoryViewer: React.FC<StoryViewerProps> = ({ stories, initialIndex, onClos
                     </div>
                 ) : (
                     <div className="w-full h-full flex items-center justify-center p-8 text-center bg-gradient-to-br from-purple-600 to-blue-500">
-                        <p className="text-2xl font-bold text-white">{currentStory.content}</p>
+                        <p className="text-xl md:text-2xl font-bold text-white">{currentStory.content}</p>
                     </div>
                 )}
             </div>
 
             {/* Footer / Reply */}
-            <div className="absolute bottom-0 left-0 right-0 p-4 z-10 bg-gradient-to-t from-black/80 to-transparent pt-10">
+            <div className="absolute bottom-0 left-0 right-0 p-4 z-40 bg-gradient-to-t from-black/80 to-transparent pt-10 safe-bottom">
                 <div className="flex gap-4 items-center max-w-lg mx-auto w-full">
                     <input
                         type="text"

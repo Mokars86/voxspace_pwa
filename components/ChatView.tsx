@@ -51,10 +51,23 @@ const ChatView: React.FC = () => {
 
       if (participantsError) throw participantsError;
 
-      // 4. Combine data
+      // 4. Fetch Unread Counts (NEW)
+      const { data: unreadCounts, error: unreadError } = await supabase
+        .rpc('get_unread_counts', { p_user_id: user.id });
+
+      if (unreadError) console.error("Error fetching unread counts:", unreadError);
+
+      const unreadMap: { [key: string]: number } = {};
+      if (unreadCounts) {
+        unreadCounts.forEach((u: any) => {
+          unreadMap[u.chat_id] = u.unread_count;
+        });
+      }
+
+      // 5. Combine data
       const formattedChats: ChatPreview[] = myChats.map((myChat: any) => {
         const chatInfo = myChat.chats;
-        const latestMsg = messages?.find((m: any) => m.chat_id === chatInfo.id);
+        const LatestMsg = messages?.find((m: any) => m.chat_id === chatInfo.id);
 
         // Determine name/avatar
         let name = 'Unknown Chat';
@@ -77,9 +90,9 @@ const ChatView: React.FC = () => {
         return {
           id: chatInfo?.id,
           name: name,
-          lastMessage: latestMsg ? latestMsg.content : 'No messages yet',
-          time: latestMsg ? new Date(latestMsg.created_at).toLocaleDateString() : '',
-          unread: 0,
+          lastMessage: LatestMsg ? LatestMsg.content : 'No messages yet',
+          time: LatestMsg ? new Date(LatestMsg.created_at).toLocaleDateString() : '',
+          unread: unreadMap[chatInfo.id] || 0, // Use RPC data
           avatar: avatar,
           isOnline: isOnline,
           isArchived: myChat.is_archived,

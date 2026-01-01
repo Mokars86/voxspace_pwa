@@ -128,6 +128,13 @@ const ChatRoom: React.FC = () => {
 
                 await fetchMessages();
 
+                // Mark as Read
+                await supabase
+                    .from('chat_participants')
+                    .update({ last_read_at: new Date().toISOString() })
+                    .eq('chat_id', chatId)
+                    .eq('user_id', user.id);
+
                 // Subscribe to real-time updates for messages and presence
                 const channel = supabase
                     .channel(`chat:${chatId}`)
