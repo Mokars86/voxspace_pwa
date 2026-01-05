@@ -24,6 +24,49 @@ const StoryViewer: React.FC<StoryViewerProps> = ({ stories, initialIndex, onClos
     const [sending, setSending] = useState(false);
     const [liked, setLiked] = useState(false);
 
+    // Viewers Modal State
+    const [showViewersModal, setShowViewersModal] = useState(false);
+    const [viewersList, setViewersList] = useState<any[]>([]);
+    const [storyLikesCount, setStoryLikesCount] = useState(0);
+    const [loadingViewers, setLoadingViewers] = useState(false);
+
+    const fetchViewersAndLikes = async () => {
+        if (!currentStory) return;
+        setLoadingViewers(true);
+        try {
+            // 1. Fetch Viewers from story_views joined with profiles
+            const { data: viewsData, error: viewsError } = await supabase
+                .from('story_views')
+                .select(`
+                    user_id,
+                    created_at,
+                    profiles:user_id (
+                        full_name, avatar_url, username
+                    )
+                `)
+                .eq('story_id', currentStory.id)
+                .order('created_at', { ascending: false });
+
+            if (viewsError) throw viewsError;
+            setViewersList(viewsData || []);
+
+            // 2. Fetch Likes Count from story_interactions
+            const { count, error: likesError } = await supabase
+                .from('story_interactions')
+                .select('id', { count: 'exact', head: true })
+                .eq('story_id', currentStory.id)
+                .eq('reaction_type', 'like');
+
+            if (likesError) throw likesError;
+            setStoryLikesCount(count || 0);
+
+        } catch (e) {
+            console.error("Error fetching story details:", e);
+        } finally {
+            setLoadingViewers(false);
+        }
+    };
+
     const currentStory = stories[currentIndex];
 
     // Reset progress & state on story change
@@ -236,7 +279,15 @@ const StoryViewer: React.FC<StoryViewerProps> = ({ stories, initialIndex, onClos
                 <div className="flex items-center gap-2 pointer-events-auto">
                     {/* View Count (Owner Only) */}
                     {user?.id === currentStory.user_id && (
-                        <div className="flex items-center gap-1 bg-black/40 px-3 py-1 rounded-full backdrop-blur-md">
+                        <div
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setIsPaused(true);
+                                setShowViewersModal(true);
+                                fetchViewersAndLikes();
+                            }}
+                            className="flex items-center gap-1 bg-black/40 px-3 py-1 rounded-full backdrop-blur-md cursor-pointer hover:bg-black/60 transition-colors"
+                        >
                             <Eye size={14} className="text-white" />
                             <span className="text-xs font-bold text-white">{currentStory.views_count || 0}</span>
                         </div>
@@ -293,6 +344,14 @@ const StoryViewer: React.FC<StoryViewerProps> = ({ stories, initialIndex, onClos
                             src={currentStory.media_url}
                             className="w-full max-w-sm mb-8 relative z-50"
                             autoPlay
+                            onLoadedMetadata={(e) => {
+                                const audioDuration = e.currentTarget.duration * 1000;
+                                if (audioDuration && !isNaN(audioDuration)) {
+                                    setDuration(audioDuration);
+                                    setIsPaused(false);
+                                }
+                            }}
+                            onEnded={handleNext}
                         />
                         <p className="text-xl font-bold pointer-events-none">Voice Note</p>
                     </div>
@@ -359,6 +418,73 @@ const StoryViewer: React.FC<StoryViewerProps> = ({ stories, initialIndex, onClos
                     )}
                 </div>
             </div>
+
+            {/* Viewers Modal */}
+            {showViewersModal && (
+                <div
+                    className="absolute inset-x-0 bottom-0 top-20 z-[100] bg-black/90 backdrop-blur-md flex flex-col animate-in slide-in-from-bottom rounded-t-3xl border-t border-white/10"
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    <div className="p-4 border-b border-white/10 flex items-center justify-between bg-white/5 rounded-t-3xl">
+                        <h3 className="text-white font-bold text-lg">Story Insights</h3>
+                        <button
+                            onClick={() => {
+                                setShowViewersModal(false);
+                                setIsPaused(false);
+                            }}
+                            className="p-2 hover:bg-white/10 rounded-full text-white"
+                        >
+                            <X size={24} />
+                        </button>
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto p-4 content-start">
+                        {/* Stats Summary */}
+                        <div className="flex gap-4 mb-6">
+                            <div className="flex-1 bg-white/5 rounded-2xl p-4 flex flex-col items-center border border-white/10 shadow-lg">
+                                <Eye className="text-blue-400 mb-2" size={28} />
+                                <span className="text-3xl font-bold text-white">{viewersList.length}</span>
+                                <span className="text-xs text-gray-400 uppercase tracking-wider font-bold mt-1">Views</span>
+                            </div>
+                            <div className="flex-1 bg-white/5 rounded-2xl p-4 flex flex-col items-center border border-white/10 shadow-lg">
+                                <Heart className="text-red-500 mb-2" fill="#ef4444" size={28} />
+                                <span className="text-3xl font-bold text-white">{storyLikesCount}</span>
+                                <span className="text-xs text-gray-400 uppercase tracking-wider font-bold mt-1">Likes</span>
+                            </div>
+                        </div>
+
+                        <h4 className="text-white/60 text-xs font-bold mb-4 uppercase tracking-wider px-2">Recent Viewers</h4>
+
+                        {loadingViewers ? (
+                            <div className="flex justify-center py-10"><div className="animate-spin w-6 h-6 border-2 border-white/20 border-t-white rounded-full"></div></div>
+                        ) : viewersList.length === 0 ? (
+                            <div className="text-white/30 text-center py-10 flex flex-col items-center">
+                                <Eye size={32} className="mb-2 opacity-50" />
+                                <p>No views yet</p>
+                            </div>
+                        ) : (
+                            <div className="space-y-4">
+                                {viewersList.map((viewer: any) => (
+                                    <div key={viewer.user_id} className="flex items-center gap-3 p-2 hover:bg-white/5 rounded-xl transition-colors">
+                                        <img
+                                            src={viewer.profiles?.avatar_url || `https://ui-avatars.com/api/?name=${viewer.profiles?.full_name || 'User'}`}
+                                            className="w-12 h-12 rounded-full border-2 border-white/10 object-cover"
+                                            alt={viewer.profiles?.username}
+                                        />
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-white font-bold text-sm truncate">{viewer.profiles?.full_name || 'Unknown User'}</p>
+                                            <p className="text-white/50 text-xs truncate">@{viewer.profiles?.username}</p>
+                                        </div>
+                                        <span className="text-white/30 text-xs whitespace-nowrap font-medium px-2 py-1 bg-white/5 rounded-lg">
+                                            {new Date(viewer.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

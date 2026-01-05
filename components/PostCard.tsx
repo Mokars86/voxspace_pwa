@@ -11,6 +11,7 @@ interface PostCardProps {
     post: Post;
     onDelete?: (id: string) => void;
     onPin?: (id: string) => void;
+    onMediaClick?: (url: string) => void;
 }
 
 interface CommentItemProps {
@@ -68,7 +69,7 @@ const CommentItem: React.FC<CommentItemProps> = ({ comment, depth = 0, currentUs
     </div>
 );
 
-const PostCard: React.FC<PostCardProps> = ({ post, onDelete, onPin }) => {
+const PostCard: React.FC<PostCardProps> = ({ post, onDelete, onPin, onMediaClick }) => {
     const navigate = useNavigate();
     const { user } = useAuth();
     const [liked, setLiked] = useState(post.isLiked || false);
@@ -346,7 +347,13 @@ const PostCard: React.FC<PostCardProps> = ({ post, onDelete, onPin }) => {
 
                     {/* Media */}
                     {post.media && (
-                        <div className="mt-3 rounded-2xl overflow-hidden border border-gray-100 dark:border-gray-700 cursor-pointer max-w-lg shadow-sm hover:shadow-md transition-shadow">
+                        <div
+                            className="mt-3 rounded-2xl overflow-hidden border border-gray-100 dark:border-gray-700 cursor-pointer max-w-lg shadow-sm hover:shadow-md transition-shadow"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                if (onMediaClick) onMediaClick(post.media!);
+                            }}
+                        >
                             {post.media_type === 'video' ? (
                                 <video src={post.media} controls className="w-full h-full object-cover max-h-[400px]" />
                             ) : post.media_type === 'audio' ? (

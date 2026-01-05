@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { PenLine, Image as ImageIcon, Sparkles, Loader2, X } from 'lucide-react';
 import PostCard from './PostCard';
 import StoryBar from './StoryBar';
+import ImageViewer from './ImageViewer';
 import { Post } from '../types';
 import { cn } from '../lib/utils';
 import { supabase } from '../services/supabase';
@@ -19,6 +20,7 @@ const FeedView: React.FC = () => {
   const [isPosting, setIsPosting] = useState(false);
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [viewingImage, setViewingImage] = useState<string | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const fetchPosts = async () => {
@@ -339,7 +341,12 @@ const FeedView: React.FC = () => {
         ) : (
           posts.length > 0 ? (
             posts.map(post => (
-              <PostCard key={post.id} post={post} onDelete={handleDeletePost} />
+              <PostCard
+                key={post.id}
+                post={post}
+                onDelete={handleDeletePost}
+                onMediaClick={(url) => setViewingImage(url)}
+              />
             ))
           ) : (
             <div className="p-8 text-center text-gray-500">
@@ -352,7 +359,14 @@ const FeedView: React.FC = () => {
             </div>
           )
         )}
+
       </div>
+
+      <ImageViewer
+        isOpen={!!viewingImage}
+        onClose={() => setViewingImage(null)}
+        src={viewingImage || ''}
+      />
     </div>
   );
 };

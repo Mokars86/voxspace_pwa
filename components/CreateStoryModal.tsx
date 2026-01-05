@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { X, Image, Type, Send, Loader2, Video, Mic, ListChecks, Trash2, StopCircle, Clock } from 'lucide-react';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../context/AuthContext';
@@ -27,9 +27,16 @@ const CreateStoryModal: React.FC<CreateStoryModalProps> = ({ onClose, onSuccess 
     const [loading, setLoading] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    // New State for Preview/Caption
     const [previewFile, setPreviewFile] = useState<{ file: File, type: 'image' | 'video' } | null>(null);
+    const [previewUrl, setPreviewUrl] = useState<string | null>(null);
     const [caption, setCaption] = useState('');
+
+    useEffect(() => {
+        // Cleanup object URL
+        return () => {
+            if (previewUrl) URL.revokeObjectURL(previewUrl);
+        };
+    }, [previewUrl]);
 
     const colors = [
         'from-purple-500 to-blue-500',
@@ -43,12 +50,18 @@ const CreateStoryModal: React.FC<CreateStoryModalProps> = ({ onClose, onSuccess 
         const file = e.target.files?.[0];
         if (!file) return;
 
+        // Cleanup previous
+        if (previewUrl) URL.revokeObjectURL(previewUrl);
+
         const isVideo = file.type.startsWith('video/');
+        const url = URL.createObjectURL(file);
+
+        setPreviewUrl(url);
         setPreviewFile({
             file,
             type: isVideo ? 'video' : 'image'
         });
-        setMode('media'); // We reuse 'media' mode name or use a new one, let's use 'media' as 'preview'
+        setMode('media');
     };
 
     const handleMediaPost = async () => {
@@ -57,7 +70,7 @@ const CreateStoryModal: React.FC<CreateStoryModalProps> = ({ onClose, onSuccess 
         setLoading(true);
         try {
             const file = previewFile.file;
-            const fileExt = file.name.split('.').pop();
+            const fileExt = file.name.split('.').pop() || 'bin'; // Fallback extension
             const fileName = `${user.id}/${Date.now()}.${fileExt}`;
             const filePath = `${fileName}`;
 
@@ -259,13 +272,13 @@ const CreateStoryModal: React.FC<CreateStoryModalProps> = ({ onClose, onSuccess 
                 )}
 
                 {/* Media Preview Mode */}
-                {mode === 'media' && previewFile && (
+                {mode === 'media' && previewFile && previewUrl && (
                     <div className="flex flex-col h-full bg-black relative">
                         <div className="flex-1 relative flex items-center justify-center bg-gray-900">
                             {previewFile.type === 'video' ? (
-                                <video src={URL.createObjectURL(previewFile.file)} className="max-w-full max-h-full object-contain" controls />
+                                <video src={previewUrl} className="max-w-full max-h-full object-contain" controls />
                             ) : (
-                                <img src={URL.createObjectURL(previewFile.file)} className="max-w-full max-h-full object-contain" alt="Preview" />
+                                <img src={previewUrl} className="max-w-full max-h-full object-contain" alt="Preview" />
                             )}
                         </div>
 
@@ -427,7 +440,7 @@ const CreateStoryModal: React.FC<CreateStoryModalProps> = ({ onClose, onSuccess 
                     type="file"
                     ref={fileInputRef}
                     onChange={handleFileUpload}
-                    accept="image/*,video/mp4,video/quicktime,video/webm"
+                    accept="image/*,video/*"
                     className="hidden"
                 />
             </div>

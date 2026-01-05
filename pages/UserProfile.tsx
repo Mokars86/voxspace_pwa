@@ -228,9 +228,26 @@ const UserProfile: React.FC = () => {
 
                     <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm text-gray-500 mb-4">
                         <div className="flex items-center gap-1"><Calendar size={16} /> Joined {new Date(profile.created_at).toLocaleDateString()}</div>
-                        {profile.website && (
-                            <div className="flex items-center gap-1"><LinkIcon size={16} /> <a href={profile.website} target="_blank" className="text-[#ff1744]">{new URL(profile.website).hostname}</a></div>
-                        )}
+                        {profile.website && (() => {
+                            try {
+                                const url = new URL(profile.website.includes('://') ? profile.website : `https://${profile.website}`);
+                                return (
+                                    <div className="flex items-center gap-1">
+                                        <LinkIcon size={16} />
+                                        <a href={url.toString()} target="_blank" rel="noopener noreferrer" className="text-[#ff1744] hover:underline">
+                                            {url.hostname}
+                                        </a>
+                                    </div>
+                                );
+                            } catch {
+                                return (
+                                    <div className="flex items-center gap-1">
+                                        <LinkIcon size={16} />
+                                        <span className="text-gray-500">{profile.website}</span>
+                                    </div>
+                                );
+                            }
+                        })()}
                     </div>
                 </div>
             </div>

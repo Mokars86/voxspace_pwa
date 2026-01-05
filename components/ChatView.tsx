@@ -162,7 +162,36 @@ const ChatView: React.FC = () => {
 
   useEffect(() => {
     // Initial fetch handled by viewMode effect
-  }, []);
+    // But we also need realtime updates for the chat list (unread counts, new messages)
+    if (!user || viewMode !== 'chats') return;
+
+    const channel = supabase
+      .channel('chat_list_updates')
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // Listen to INSERT (new msg) and UPDATE (read status)
+          schema: 'public',
+          table: 'messages'
+        },
+        () => fetchChats()
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE', // Listen for last_read_at updates
+          schema: 'public',
+          table: 'chat_participants',
+          filter: `user_id=eq.${user.id}`
+        },
+        () => fetchChats()
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user, viewMode]);
 
   const handleArchive = async (e: React.MouseEvent, chatId: string, currentStatus: boolean) => {
     e.stopPropagation();
@@ -253,7 +282,7 @@ const ChatView: React.FC = () => {
   };
 
   const filteredChats = chats.filter(chat => {
-    const matchesFilter = chat.name.toLowerCase().includes(filter.toLowerCase());
+    const matchesFilter = (chat.name || '').toLowerCase().includes((filter || '').toLowerCase());
 
     // Status Logic
     // If 'requests' -> status must be 'pending'
@@ -277,6 +306,32 @@ const ChatView: React.FC = () => {
     if (!a.isPinned && b.isPinned) return 1;
     return 0; // Existing order preserved (created_at desc)
   });
+
+  // Long Press Logic
+  const longPressTimer = React.useRef<any>(null);
+  const isLongPress = React.useRef(false); // Ref to track if current interaction is a LP to prevent click
+  const [contextMenuChat, setContextMenuChat] = useState<ChatPreview | null>(null);
+
+  const startPress = (chat: ChatPreview) => {
+    isLongPress.current = false;
+    longPressTimer.current = setTimeout(() => {
+      isLongPress.current = true;
+      if (navigator.vibrate) navigator.vibrate(50);
+      setContextMenuChat(chat);
+    }, 500);
+  };
+
+  const cancelPress = () => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  };
+
+  const handleChatClick = (chatId: string) => {
+    if (isLongPress.current) return;
+    navigate(`/chat/${chatId}`);
+  };
 
   return (
     <div className="flex flex-col h-full bg-white dark:bg-gray-900 transition-colors relative">
@@ -341,7 +396,7 @@ const ChatView: React.FC = () => {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto select-none" onScroll={cancelPress}>
         {loading ? (
           <div className="flex py-12 justify-center">
             <Loader2 className="animate-spin text-gray-300" />
@@ -382,7 +437,13 @@ const ChatView: React.FC = () => {
           filteredChats.map((chat) => (
             <div
               key={chat.id}
-              onClick={() => navigate(`/chat/${chat.id}`)}
+              onClick={() => handleChatClick(chat.id)}
+              onMouseDown={() => startPress(chat)}
+              onMouseUp={cancelPress}
+              onMouseLeave={cancelPress}
+              onTouchStart={() => startPress(chat)}
+              onTouchEnd={cancelPress}
+              onTouchMove={cancelPress}
               className="group relative flex items-center p-4 hover:bg-gray-50 dark:hover:bg-gray-800 active:bg-gray-100 dark:active:bg-gray-700 transition-colors cursor-pointer border-b border-gray-50 dark:border-gray-800"
             >
               <div className="relative mr-4">
@@ -390,7 +451,7 @@ const ChatView: React.FC = () => {
                   {chat.avatar ? (
                     <img src={chat.avatar} alt={chat.name} className="w-full h-full object-cover" />
                   ) : (
-                    chat.name[0]
+                    (chat.name || '?')[0]
                   )}
                 </div>
                 {chat.isOnline && (
@@ -411,36 +472,13 @@ const ChatView: React.FC = () => {
                     {chat.status === 'pending' ? 'Message Request' : chat.lastMessage}
                   </p>
 
-                  {/* Action Buttons */}
-                  <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity absolute right-4 bottom-4 bg-white/80 dark:bg-gray-900/80 p-1 rounded-lg backdrop-blur-sm">
-                    <button
-                      onClick={(e) => handleArchive(e, chat.id, chat.isArchived || false)}
-                      className="p-1.5 text-gray-500 hover:text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/30 rounded-full"
-                      title={chat.isArchived ? "Unarchive" : "Archive"}
-                    >
-                      <Archive size={16} />
-                    </button>
-                    <button
-                      onClick={(e) => handlePin(e, chat.id, chat.isPinned || false)}
-                      className={cn("p-1.5 rounded-full", chat.isPinned ? "text-[#ff1744] bg-red-50" : "text-gray-500 hover:text-[#ff1744] hover:bg-red-50")}
-                      title={chat.isPinned ? "Unpin" : "Pin"}
-                    >
-                      <div className="rotate-45">📌</div>
-                    </button>
-                    <button
-                      onClick={(e) => handleDelete(e, chat.id)}
-                      className="p-1 px-2 text-xs font-bold text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-full"
-                    >
-                      Delete
-                    </button>
-                  </div>
-
+                  {/* Unread Count / Status */}
                   {chat.unread > 0 ? (
                     <div className="w-5 h-5 bg-[#ff1744] rounded-full flex items-center justify-center">
                       <span className="text-[10px] text-white font-bold">{chat.unread}</span>
                     </div>
                   ) : (
-                    <div className="group-hover:opacity-0 transition-opacity">
+                    <div className="opacity-0">
                       <CheckCheck size={16} className="text-blue-500" />
                     </div>
                   )}
@@ -458,6 +496,87 @@ const ChatView: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Context Menu Modal */}
+      {contextMenuChat && (
+        <>
+          <div className="fixed inset-0 z-[60] bg-black/40 backdrop-blur-sm animate-in fade-in" onClick={() => setContextMenuChat(null)} />
+          <div className="fixed bottom-0 sm:bottom-4 sm:left-4 sm:right-4 z-[70] bg-white dark:bg-gray-900 rounded-t-2xl sm:rounded-2xl shadow-2xl p-4 animate-in slide-in-from-bottom-full duration-200 border border-gray-100 dark:border-gray-800">
+            <div className="flex items-center gap-4 mb-6 pb-4 border-b border-gray-100 dark:border-gray-800">
+              <div className="w-12 h-12 rounded-full bg-gray-100 dark:bg-gray-800 overflow-hidden">
+                {contextMenuChat.avatar ? <img src={contextMenuChat.avatar} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center font-bold text-gray-500">{(contextMenuChat.name || '?')[0]}</div>}
+              </div>
+              <div className="flex-1">
+                <h3 className="font-bold text-lg dark:text-white">{contextMenuChat.name}</h3>
+                <p className="text-xs text-gray-500">{contextMenuChat.isGroup ? 'Group Chat' : 'Personal Chat'}</p>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <button
+                onClick={(e) => {
+                  handlePin(e, contextMenuChat.id, contextMenuChat.isPinned || false);
+                  setContextMenuChat(null);
+                }}
+                className="w-full flex items-center gap-4 p-3 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-left font-medium dark:text-gray-200"
+              >
+                <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-500 flex items-center justify-center">
+                  <span className="text-lg">📌</span>
+                </div>
+                {contextMenuChat.isPinned ? 'Unpin Chat' : 'Pin Chat'}
+              </button>
+
+              <button
+                onClick={(e) => {
+                  handleArchive(e, contextMenuChat.id, contextMenuChat.isArchived || false);
+                  setContextMenuChat(null);
+                }}
+                className="w-full flex items-center gap-4 p-3 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-left font-medium dark:text-gray-200"
+              >
+                <div className="w-10 h-10 rounded-full bg-orange-50 text-orange-500 flex items-center justify-center">
+                  <Archive size={20} />
+                </div>
+                {contextMenuChat.isArchived ? 'Unarchive Chat' : 'Archive Chat'}
+              </button>
+
+              <button
+                onClick={(e) => {
+                  handleDelete(e, contextMenuChat.id);
+                  setContextMenuChat(null);
+                }}
+                className="w-full flex items-center gap-4 p-3 rounded-xl hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors text-left font-medium text-red-500"
+              >
+                <div className="w-10 h-10 rounded-full bg-red-100 text-red-500 flex items-center justify-center">
+                  <div className="text-lg">🗑️</div>
+                </div>
+                Delete Chat
+              </button>
+
+              {contextMenuChat.isGroup && (
+                <button
+                  onClick={(e) => {
+                    handleEdit(e, contextMenuChat);
+                    setContextMenuChat(null);
+                  }}
+                  className="w-full flex items-center gap-4 p-3 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-left font-medium dark:text-gray-200"
+                >
+                  <div className="w-10 h-10 rounded-full bg-purple-50 text-purple-500 flex items-center justify-center">
+                    <Edit size={20} />
+                  </div>
+                  Rename Group
+                </button>
+              )}
+            </div>
+
+            <button
+              onClick={() => setContextMenuChat(null)}
+              className="w-full mt-4 py-3 bg-gray-100 dark:bg-gray-800 rounded-xl font-bold text-gray-600 dark:text-gray-400"
+            >
+              Cancel
+            </button>
+          </div>
+        </>
+      )}
 
       {/* Rename Modal */}
       {

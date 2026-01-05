@@ -1,6 +1,6 @@
 import React from 'react';
 import { cn } from '../../lib/utils';
-import { Check, CheckCheck, Play, Pause, File as FileIcon, MapPin, Music, Timer, EyeOff, Lock } from 'lucide-react';
+import { Check, CheckCheck, Play, Pause, File as FileIcon, MapPin, Music, Timer, EyeOff, Lock, Video, Reply } from 'lucide-react';
 
 export interface ChatMessage {
     id: string;
@@ -22,6 +22,7 @@ export interface ChatMessage {
     expiresAt?: string;
     viewOnce?: boolean;
     isViewed?: boolean;
+    isPinned?: boolean;
 }
 
 export interface MessageProps {
@@ -34,6 +35,7 @@ export interface MessageProps {
     onForward?: (msg: any) => void;
     onMediaClick?: (url: string, type: 'image' | 'video') => void;
     onViewOnce?: (msg: ChatMessage) => void;
+    onPin?: (msg: ChatMessage) => void;
 }
 
 const AudioPlayer = ({ url, isMe, duration: initialDuration, type }: { url: string, isMe: boolean, duration?: number | string, type: string }) => {
@@ -49,14 +51,18 @@ const AudioPlayer = ({ url, isMe, duration: initialDuration, type }: { url: stri
         }
     }, [initialDuration]);
 
-    const togglePlay = () => {
+    const togglePlay = async () => {
         if (!audioRef.current) return;
-        if (isPlaying) {
-            audioRef.current.pause();
-        } else {
-            audioRef.current.play();
+        try {
+            if (isPlaying) {
+                audioRef.current.pause();
+            } else {
+                await audioRef.current.play();
+            }
+        } catch (e) {
+            console.error("Playback failed", e);
+            setIsPlaying(false);
         }
-        setIsPlaying(!isPlaying);
     };
 
     const handleTimeUpdate = () => {
@@ -79,7 +85,7 @@ const AudioPlayer = ({ url, isMe, duration: initialDuration, type }: { url: stri
         const rect = progressBarRef.current.getBoundingClientRect();
         const x = e.clientX - rect.left;
         const percentage = Math.min(Math.max(x / rect.width, 0), 1);
-        const newTime = (duration || audioRef.current.duration || 10) * percentage; // Fallback 10s if duration unknown
+        const newTime = (duration || audioRef.current.duration || 10) * percentage;
 
         audioRef.current.currentTime = newTime;
         setCurrentTime(newTime);
@@ -92,7 +98,7 @@ const AudioPlayer = ({ url, isMe, duration: initialDuration, type }: { url: stri
     };
 
     return (
-        <div className="flex items-center gap-3 min-w-[220px] py-1">
+        <div className="flex items-center gap-3 w-full py-1">
             <button
                 onClick={(e) => { e.stopPropagation(); togglePlay(); }}
                 className={cn(
@@ -111,7 +117,6 @@ const AudioPlayer = ({ url, isMe, duration: initialDuration, type }: { url: stri
                 <div className="h-8 flex items-center gap-[2px] w-full">
                     {[...Array(30)].map((_, i) => {
                         const progress = currentTime / (duration || 1);
-                        // Visual effect: random heights for "waveform" look, but could be real data later
                         const height = Math.max(20, Math.random() * 100) + '%';
                         const isPlayed = (i / 30) < progress;
 
@@ -138,21 +143,56 @@ const AudioPlayer = ({ url, isMe, duration: initialDuration, type }: { url: stri
             <audio
                 ref={audioRef}
                 src={url}
+                onPlay={() => setIsPlaying(true)}
+                onPause={() => setIsPlaying(false)}
                 onTimeUpdate={handleTimeUpdate}
                 onLoadedMetadata={handleTimeUpdate}
                 onEnded={handleEnded}
+                onError={(e) => console.error("Audio Load Error", e)}
                 className="hidden"
             />
         </div>
     );
 };
 
-const MessageBubble: React.FC<MessageProps> = ({ message, onSwipeReply, onReact, onLongPress, onEdit, onDelete, onForward, onMediaClick, onViewOnce }) => {
+const MessageBubble: React.FC<MessageProps> = ({ message, onSwipeReply, onReact, onLongPress, onEdit, onDelete, onForward, onMediaClick, onViewOnce, onPin }) => {
     const isMe = message.sender === 'me';
     const [isPlaying, setIsPlaying] = React.useState(false);
     const [showMenu, setShowMenu] = React.useState(false);
     const [isEditing, setIsEditing] = React.useState(false);
     const [editText, setEditText] = React.useState(message.text);
+
+    // Swipe Logic
+    const [swipeOffset, setSwipeOffset] = React.useState(0);
+    const touchStartRef = React.useRef<number | null>(null);
+    const SWIPE_THRESHOLD = 50;
+
+    const handleTouchStart = (e: React.TouchEvent) => {
+        if (showMenu || isEditing) return; // Disable swipe if menu/edit open
+        touchStartRef.current = e.targetTouches[0].clientX;
+    };
+
+    const handleTouchMove = (e: React.TouchEvent) => {
+        if (touchStartRef.current === null) return;
+        const currentX = e.targetTouches[0].clientX;
+        const diff = currentX - touchStartRef.current;
+
+        // Only allow swiping right (positive diff) and clamp it
+        if (diff > 0 && diff < 100) {
+            setSwipeOffset(diff);
+        }
+    };
+
+    const handleTouchEnd = () => {
+        if (swipeOffset > SWIPE_THRESHOLD) {
+            if (onSwipeReply) onSwipeReply(message);
+            // Haptic feedback if available
+            if (navigator.vibrate) navigator.vibrate(50);
+        }
+        setSwipeOffset(0);
+        touchStartRef.current = null;
+    };
+
 
     if (message.isDeleted) {
         return (
@@ -174,13 +214,31 @@ const MessageBubble: React.FC<MessageProps> = ({ message, onSwipeReply, onReact,
 
     return (
         <div
-            className={cn("flex w-full mb-2 group relative", isMe ? "justify-end" : "justify-start")}
+            className={cn("flex w-full mb-2 group relative items-center", isMe ? "justify-end" : "justify-start")}
             onDoubleClick={() => onReact && onReact(message.id, '❤️')}
             onContextMenu={(e) => {
                 e.preventDefault();
                 setShowMenu(true);
             }}
+            // Swipe Listeners
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
         >
+            {/* Reply Icon Indicator (Visible on Swipe) */}
+            <div
+                className="absolute left-0 flex items-center justify-center text-gray-400 transition-opacity duration-200"
+                style={{
+                    opacity: swipeOffset > 10 ? Math.min(swipeOffset / SWIPE_THRESHOLD, 1) : 0,
+                    transform: `translateX(${Math.min(swipeOffset / 2, 20)}px) scale(${Math.min(swipeOffset / SWIPE_THRESHOLD, 1)})`
+                }}
+            >
+                <div className={cn("p-1.5 rounded-full", swipeOffset > SWIPE_THRESHOLD ? "bg-gray-200 text-[#ff1744]" : "")}>
+                    <Reply size={20} />
+                </div>
+            </div>
+
+
             {/* Context Menu */}
             {showMenu && (
                 <>
@@ -189,6 +247,9 @@ const MessageBubble: React.FC<MessageProps> = ({ message, onSwipeReply, onReact,
                         "absolute top-8 z-50 bg-white rounded-xl shadow-xl w-32 py-2 overflow-hidden border border-gray-100 animate-in fade-in zoom-in duration-200 origin-top-left",
                         isMe ? "right-0" : "left-0"
                     )}>
+                        <button onClick={() => { onPin && onPin(message); setShowMenu(false); }} className="w-full text-left px-4 py-2 hover:bg-gray-50 text-sm font-medium">
+                            {message.isPinned ? "Unpin Message" : "Pin Message"}
+                        </button>
                         {isMe && message.type === 'text' && (
                             <button onClick={() => setIsEditing(true)} className="w-full text-left px-4 py-2 hover:bg-gray-50 text-sm font-medium">Edit</button>
                         )}
@@ -212,12 +273,15 @@ const MessageBubble: React.FC<MessageProps> = ({ message, onSwipeReply, onReact,
                 </>
             )}
 
-            <div className={cn(
-                "relative max-w-[75%] rounded-2xl shadow-sm transition-all",
-                isMe
-                    ? "bg-[#ff1744] text-white rounded-tr-none"
-                    : "bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-tl-none"
-            )}>
+            <div
+                className={cn(
+                    "relative max-w-[75%] rounded-2xl shadow-sm transition-transform duration-75 overflow-hidden",
+                    isMe
+                        ? "bg-[#ff1744] text-white rounded-tr-none"
+                        : "bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-tl-none"
+                )}
+                style={{ transform: `translateX(${swipeOffset}px)` }}
+            >
                 {/* Reply Context */}
                 {message.replyTo && (
                     <div className={cn(
@@ -276,8 +340,22 @@ const MessageBubble: React.FC<MessageProps> = ({ message, onSwipeReply, onReact,
 
                             {/* Media: Video */}
                             {message.type === 'video' && message.mediaUrl && (
-                                <div className="mb-1 overflow-hidden rounded-lg relative">
-                                    <video src={message.mediaUrl} controls className="w-full max-h-[300px] rounded-lg" />
+                                <div
+                                    className="mb-1 overflow-hidden rounded-lg relative cursor-pointer group"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        onMediaClick && onMediaClick(message.mediaUrl!, 'video');
+                                    }}
+                                >
+                                    <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/30 transition-colors z-10">
+                                        <div className="w-12 h-12 rounded-full bg-black/50 flex items-center justify-center backdrop-blur-sm shadow-sm ring-1 ring-white/20 group-hover:scale-110 transition-transform">
+                                            <Play className="text-white fill-white ml-1" size={24} />
+                                        </div>
+                                    </div>
+                                    <video src={message.mediaUrl} className="w-full max-h-[300px] rounded-lg object-cover bg-black" />
+                                    <div className="absolute bottom-2 right-2 px-2 py-0.5 bg-black/60 rounded text-[10px] text-white font-medium flex items-center gap-1">
+                                        <Video size={10} /> Video
+                                    </div>
                                 </div>
                             )}
 

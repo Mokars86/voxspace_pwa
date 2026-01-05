@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Phone, PhoneOff, Mic, MicOff, User, Video, VideoOff } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
-export type CallState = 'idle' | 'outgoing' | 'incoming' | 'connected' | 'ending';
+export type CallState = 'idle' | 'outgoing' | 'incoming' | 'connected' | 'reconnecting' | 'ending';
 
 interface CallOverlayProps {
     isOpen: boolean;
@@ -40,29 +40,43 @@ const CallOverlay: React.FC<CallOverlayProps> = ({
     const [duration, setDuration] = useState(0);
     const localVideoRef = useRef<HTMLVideoElement>(null);
     const remoteVideoRef = useRef<HTMLVideoElement>(null);
+    const [isPlaying, setIsPlaying] = useState(false);
+    const audioRef = useRef<HTMLAudioElement>(null);
 
-    useEffect(() => {
-        let interval: any;
-        if (state === 'connected') {
-            interval = setInterval(() => {
-                setDuration(d => d + 1);
-            }, 1000);
-        } else {
-            setDuration(0);
+    // Helper to attempt playback
+    const attemptPlay = async (element: HTMLMediaElement, updateState: boolean = true) => {
+        try {
+            await element.play();
+            if (updateState) setIsPlaying(true);
+        } catch (err) {
+            console.error("Autoplay prevented:", err);
+            if (updateState) setIsPlaying(false);
         }
-        return () => clearInterval(interval);
-    }, [state]);
+    };
 
-    // Attach streams
     useEffect(() => {
         if (localVideoRef.current && localStream) {
             localVideoRef.current.srcObject = localStream;
+            localVideoRef.current.onloadedmetadata = () => {
+                localVideoRef.current!.muted = true; // Always mute local video to prevent feedback
+                attemptPlay(localVideoRef.current!, false); // Don't count local video as "playing" for the blockage check
+            };
         }
     }, [localStream, isOpen]);
 
     useEffect(() => {
         if (remoteVideoRef.current && remoteStream) {
             remoteVideoRef.current.srcObject = remoteStream;
+            remoteVideoRef.current.onloadedmetadata = () => {
+                attemptPlay(remoteVideoRef.current!);
+            };
+        }
+
+        if (audioRef.current && remoteStream) {
+            audioRef.current.srcObject = remoteStream;
+            audioRef.current.onloadedmetadata = () => {
+                attemptPlay(audioRef.current!);
+            };
         }
     }, [remoteStream, isOpen]);
 
@@ -75,7 +89,7 @@ const CallOverlay: React.FC<CallOverlayProps> = ({
     if (!isOpen || state === 'idle') return null;
 
     return (
-        <div className="fixed inset-0 z-[100] bg-gray-900/95 backdrop-blur-sm flex flex-col items-center justify-center text-white animate-in fade-in duration-300 overflow-hidden">
+        <div className={cn("fixed inset-0 z-[100] backdrop-blur-sm flex flex-col items-center justify-center text-white animate-in fade-in duration-300 overflow-hidden", isVideoCall ? "bg-black/50" : "bg-gray-900/95")}>
 
             {/* Background Video (Remote) */}
             {isVideoCall && (
@@ -124,10 +138,30 @@ const CallOverlay: React.FC<CallOverlayProps> = ({
                         {state === 'incoming' && (isVideoCall ? 'Incoming Video Call...' : 'Incoming Audio Call...')}
                         {state === 'outgoing' && 'Calling...'}
                         {state === 'connected' && formatDuration(duration)}
+                        {state === 'reconnecting' && <span className="text-yellow-400 animate-pulse">Reconnecting...</span>}
                         {state === 'ending' && 'Call Ended'}
                     </p>
                 </div>
             </div>
+
+            {/* Hidden Audio Element for reliable playback */}
+            <audio ref={audioRef} autoPlay playsInline hidden />
+
+            {/* Fallback "Tap to Play" if autoplay blocked */}
+            {!isPlaying && state === 'connected' && (
+                <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+                    <button
+                        onClick={() => {
+                            if (remoteVideoRef.current) attemptPlay(remoteVideoRef.current);
+                            if (audioRef.current) attemptPlay(audioRef.current);
+                            if (localVideoRef.current) attemptPlay(localVideoRef.current);
+                        }}
+                        className="px-6 py-3 bg-blue-600 rounded-full text-white font-bold shadow-2xl animate-bounce"
+                    >
+                        Tap to Start Audio/Video
+                    </button>
+                </div>
+            )}
 
             {/* Controls */}
             <div className="flex items-center gap-8 absolute bottom-12 z-20">
