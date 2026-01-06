@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../context/AuthContext';
-import { ArrowLeft, MessageSquare, Calendar, MapPin, Link as LinkIcon, Loader2 } from 'lucide-react';
+import { ArrowLeft, MessageSquare, Calendar, MapPin, Link as LinkIcon, Loader2, MoreVertical, Ban, ShieldAlert } from 'lucide-react';
 import PostCard from '../components/PostCard';
 import { Post } from '../types';
 import ImageViewer from '../components/ImageViewer';
@@ -15,6 +15,8 @@ interface ProfileData {
     bio: string;
     website: string;
     created_at: string;
+    profile_photo_privacy?: 'everyone' | 'contacts' | 'nobody';
+    about_privacy?: 'everyone' | 'contacts' | 'nobody';
 }
 
 const UserProfile: React.FC = () => {
@@ -27,8 +29,11 @@ const UserProfile: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [isFollowing, setIsFollowing] = useState(false);
     const [followLoading, setFollowLoading] = useState(false);
+
     const [messingLoading, setMessagingLoading] = useState(false);
     const [previewImage, setPreviewImage] = useState<string | null>(null);
+    const [isBlocked, setIsBlocked] = useState(false);
+    const [showMenu, setShowMenu] = useState(false);
 
     useEffect(() => {
         const fetchProfileData = async () => {
@@ -55,6 +60,16 @@ const UserProfile: React.FC = () => {
                         .maybeSingle();
 
                     setIsFollowing(!!followData);
+
+                    // Check Block Status
+                    const { data: blockData } = await supabase
+                        .from('blocked_users')
+                        .select('id')
+                        .eq('blocker_id', currentUser.id)
+                        .eq('blocked_id', id)
+                        .maybeSingle();
+
+                    setIsBlocked(!!blockData);
                 }
 
                 // 3. Fetch Posts
@@ -153,18 +168,77 @@ const UserProfile: React.FC = () => {
         }
     };
 
+    const handleBlockToggle = async () => {
+        if (!currentUser || !id) return;
+        if (!confirm(`Are you sure you want to ${isBlocked ? 'unblock' : 'block'} this user?`)) return;
+
+        try {
+            if (isBlocked) {
+                // Unblock
+                const { error } = await supabase
+                    .from('blocked_users')
+                    .delete()
+                    .eq('blocker_id', currentUser.id)
+                    .eq('blocked_id', id);
+                if (error) throw error;
+                setIsBlocked(false);
+                alert("User unblocked");
+            } else {
+                // Block
+                const { error } = await supabase
+                    .from('blocked_users')
+                    .insert({ blocker_id: currentUser.id, blocked_id: id });
+                if (error) throw error;
+                setIsBlocked(true);
+                alert("User blocked");
+            }
+            setShowMenu(false);
+        } catch (error) {
+            console.error("Error updating block status", error);
+            alert("Failed to update block status");
+        }
+    };
+
+    const isOwnProfile = currentUser?.id === profile?.id;
+    const showAvatar = isOwnProfile ||
+        profile?.profile_photo_privacy === 'everyone' ||
+        (profile?.profile_photo_privacy === 'contacts' && isFollowing); // Assuming following = contact
+
+    const showBio = isOwnProfile ||
+        profile?.about_privacy === 'everyone' ||
+        (profile?.about_privacy === 'contacts' && isFollowing);
+
     if (loading) return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin text-gray-300" /></div>;
     if (!profile) return <div>User not found</div>;
-
-    const isOwnProfile = currentUser?.id === profile.id;
 
     return (
         <div className="flex flex-col h-screen bg-white">
             {/* Header */}
             <div className="h-32 bg-gradient-to-r from-blue-500 to-purple-500 relative">
-                <button onClick={() => navigate(-1)} className="absolute top-4 left-4 p-2 bg-black/20 rounded-full text-white backdrop-blur-sm hover:bg-black/30 transition-colors">
+                <button onClick={() => navigate(-1)} className="absolute top-4 left-4 p-2 bg-black/20 rounded-full text-white backdrop-blur-sm hover:bg-black/30 transition-colors z-10">
                     <ArrowLeft size={20} />
                 </button>
+                {!isOwnProfile && currentUser && (
+                    <div className="absolute top-4 right-4 z-10">
+                        <button
+                            onClick={() => setShowMenu(!showMenu)}
+                            className="p-2 bg-black/20 rounded-full text-white backdrop-blur-sm hover:bg-black/30 transition-colors"
+                        >
+                            <MoreVertical size={20} />
+                        </button>
+                        {showMenu && (
+                            <div className="absolute right-0 top-12 w-48 bg-white dark:bg-gray-900 rounded-xl shadow-xl border border-gray-100 dark:border-gray-800 py-1 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                                <button
+                                    onClick={handleBlockToggle}
+                                    className="w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center gap-3 text-sm text-red-600 dark:text-red-400"
+                                >
+                                    {isBlocked ? <ShieldAlert size={16} /> : <Ban size={16} />}
+                                    {isBlocked ? "Unblock User" : "Block User"}
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                )}
             </div>
 
             <div className="px-4 pb-4 relative">
@@ -175,7 +249,9 @@ const UserProfile: React.FC = () => {
                         disabled={!profile.avatar_url}
                     >
                         <img
-                            src={profile.avatar_url || `https://ui-avatars.com/api/?name=${profile.full_name}&background=random`}
+                            src={showAvatar
+                                ? (profile.avatar_url || `https://ui-avatars.com/api/?name=${profile.full_name}&background=random`)
+                                : `https://ui-avatars.com/api/?name=${profile.full_name?.charAt(0) || 'U'}&background=random`}
                             alt="Profile"
                             className="w-20 h-20 rounded-full border-4 border-white object-cover shadow-sm bg-white hover:opacity-90 transition-opacity"
                         />
@@ -213,7 +289,9 @@ const UserProfile: React.FC = () => {
                 <div>
                     <h1 className="text-2xl font-bold text-gray-900">{profile.full_name}</h1>
                     <p className="text-gray-500 text-sm mb-3">@{profile.username}</p>
-                    <p className="text-gray-900 mb-3 whitespace-pre-wrap">{profile.bio || "No bio yet."}</p>
+                    <p className="text-gray-900 mb-3 whitespace-pre-wrap">
+                        {showBio ? (profile.bio || "No bio yet.") : <span className="text-gray-400 italic">Bio hidden</span>}
+                    </p>
 
                     <div className="flex items-center gap-4 mb-4">
                         <div className="flex items-center gap-1">

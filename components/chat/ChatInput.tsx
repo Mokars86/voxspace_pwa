@@ -20,6 +20,15 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSend, onTyping, replyTo, onCanc
     const [showAttachMenu, setShowAttachMenu] = useState(false);
     const [isRecording, setIsRecording] = useState(false);
     const [isViewOnce, setIsViewOnce] = useState(false);
+    const [localBuzz, setLocalBuzz] = useState(false);
+
+    const handleBuzzClick = () => {
+        setLocalBuzz(true);
+        if (navigator.vibrate) navigator.vibrate(50);
+        (onSend as any)("BUZZ!", 'buzz');
+        setShowAttachMenu(false);
+        setTimeout(() => setLocalBuzz(false), 500);
+    };
 
     const [recordingDuration, setRecordingDuration] = useState(0);
     const mediaRecorder = useRef<MediaRecorder | null>(null);
@@ -248,8 +257,10 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSend, onTyping, replyTo, onCanc
                                     <div className="w-10 h-10 rounded-full bg-pink-100 text-pink-500 flex items-center justify-center"><Timer size={20} /></div>
                                     <span className="text-xs font-medium dark:text-gray-300">View Once</span>
                                 </button>
-                                <button type="button" onClick={() => { (onSend as any)("BUZZ!", 'buzz'); setShowAttachMenu(false); }} className="flex flex-col items-center gap-1 p-2 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-xl transition-colors">
-                                    <div className="w-10 h-10 rounded-full bg-[#FFD700] hover:bg-[#FFC000] text-white flex items-center justify-center shadow-md transition-all active:scale-95"><Zap size={20} className="fill-current" /></div>
+                                <button type="button" onClick={handleBuzzClick} className="flex flex-col items-center gap-1 p-2 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-xl transition-colors">
+                                    <div className={cn("w-10 h-10 rounded-full bg-[#ff1744] hover:bg-[#ff1744]/90 text-white flex items-center justify-center shadow-md transition-all active:scale-95", localBuzz && "animate-shake")}>
+                                        <Zap size={20} className={cn("fill-current", localBuzz && "text-yellow-300")} />
+                                    </div>
                                     <span className="text-xs font-medium dark:text-gray-300">Buzz</span>
                                 </button>
                             </div>

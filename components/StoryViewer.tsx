@@ -272,7 +272,11 @@ const StoryViewer: React.FC<StoryViewerProps> = ({ stories, initialIndex, onClos
                     />
                     <div className="flex flex-col">
                         <span className="font-bold text-shadow leading-none truncate max-w-[120px] sm:max-w-xs">{currentStory.user?.username}</span>
-                        <span className="text-white/70 text-xs">{new Date(currentStory.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                        <div className="flex gap-2 text-xs text-white/70">
+                            <span>{new Date(currentStory.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                            <span>•</span>
+                            <span>Expires in {Math.max(0, Math.ceil((new Date((currentStory as any).expires_at).getTime() - Date.now()) / (1000 * 60 * 60)))}h</span>
+                        </div>
                     </div>
                 </div>
 

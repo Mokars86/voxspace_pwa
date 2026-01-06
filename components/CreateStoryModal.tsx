@@ -341,15 +341,7 @@ const CreateStoryModal: React.FC<CreateStoryModalProps> = ({ onClose, onSuccess 
 
                                     <div className="flex items-center gap-1 bg-black/20 rounded-lg px-2 py-2">
                                         <Clock size={14} className="text-white" />
-                                        <select
-                                            value={duration}
-                                            onChange={(e) => setDuration(Number(e.target.value) as any)}
-                                            className="bg-transparent text-white border-none text-xs outline-none cursor-pointer"
-                                        >
-                                            <option value={12} className="text-black">12h</option>
-                                            <option value={24} className="text-black">24h</option>
-                                            <option value={48} className="text-black">48h</option>
-                                        </select>
+                                        <span className="text-white text-xs font-medium">24h</span>
                                     </div>
                                 </div>
 

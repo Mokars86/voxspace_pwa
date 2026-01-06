@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Users, MessageSquare, Mic, Globe, Share2, MoreVertical, Loader2, Camera, Trash2, Calendar, Image as ImageIcon, Pin, X, StopCircle, Play, Pause } from 'lucide-react';
+import { ArrowLeft, Users, MessageSquare, Mic, Globe, Share2, MoreVertical, Loader2, Camera, Trash2, Calendar, Image as ImageIcon, Pin, X, StopCircle, Play, Pause, MapPin } from 'lucide-react';
 import { supabase } from '../../services/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { cn } from '../../lib/utils';
@@ -41,6 +41,33 @@ const SpaceDetail: React.FC = () => {
     const [postMediaType, setPostMediaType] = useState<'image' | 'audio' | null>(null);
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
     const [isRecording, setIsRecording] = useState(false);
+
+    // Event State
+    const [showEventModal, setShowEventModal] = useState(false);
+    const [newEvent, setNewEvent] = useState({ title: '', description: '', start_time: '', location: '' });
+
+    const handleCreateEvent = async () => {
+        if (!newEvent.title || !newEvent.start_time || !user) return;
+        try {
+            const { error } = await supabase.from('space_events').insert({
+                space_id: id,
+                title: newEvent.title,
+                description: newEvent.description,
+                start_time: new Date(newEvent.start_time).toISOString(),
+                location: newEvent.location,
+                created_by: user.id
+            });
+            if (error) throw error;
+            setShowEventModal(false);
+            setNewEvent({ title: '', description: '', start_time: '', location: '' });
+            fetchEvents();
+            alert("Event created successfully!");
+        } catch (error: any) {
+            console.error("Error creating event:", error);
+            alert("Failed to create event");
+        }
+    };
+
     const [recordingDuration, setRecordingDuration] = useState(0);
 
     // Refs
@@ -114,11 +141,12 @@ const SpaceDetail: React.FC = () => {
             if (postMedia) {
                 const ext = postMediaType === 'audio' ? 'webm' : postMedia instanceof File ? postMedia.name.split('.').pop() : 'jpg';
                 const fileName = `space-post-${Date.now()}.${ext}`;
-                const { error: uploadError } = await supabase.storage.from('VoxSpace_App').upload(fileName, postMedia);
+                // Usage of new bucket
+                const { error: uploadError } = await supabase.storage.from('space-media').upload(fileName, postMedia);
 
                 if (uploadError) throw uploadError;
 
-                const { data } = supabase.storage.from('VoxSpace_App').getPublicUrl(fileName);
+                const { data } = supabase.storage.from('space-media').getPublicUrl(fileName);
                 mediaUrl = data.publicUrl;
                 mediaType = postMediaType;
             }
@@ -625,6 +653,16 @@ const SpaceDetail: React.FC = () => {
                 {/* EVENTS TAB */}
                 {activeTab === 'events' && (
                     <div className="p-4 space-y-4">
+                        {isMember && (
+                            <button
+                                onClick={() => setShowEventModal(true)}
+                                className="w-full py-3 bg-white border-2 border-dashed border-gray-300 rounded-2xl text-gray-500 font-bold hover:border-[#ff1744] hover:text-[#ff1744] transition-colors flex items-center justify-center gap-2"
+                            >
+                                <Calendar size={20} />
+                                Create New Event
+                            </button>
+                        )}
+
                         {events.length > 0 ? (
                             events.map(ev => (
                                 <div key={ev.id} className="bg-white p-4 rounded-2xl shadow-sm border-l-4 border-[#ff1744]">
@@ -635,6 +673,12 @@ const SpaceDetail: React.FC = () => {
                                                 <Calendar size={14} />
                                                 <span>{new Date(ev.start_time).toLocaleString()}</span>
                                             </div>
+                                            {ev.location && (
+                                                <div className="flex items-center gap-2 text-gray-500 text-sm mt-1">
+                                                    <MapPin size={14} />
+                                                    <span>{ev.location}</span>
+                                                </div>
+                                            )}
                                             <p className="text-gray-600 mt-2 text-sm">{ev.description}</p>
                                         </div>
                                     </div>
@@ -684,6 +728,67 @@ const SpaceDetail: React.FC = () => {
                     spaceId={space.id}
                     isOwner={isOwner}
                 />
+            )}
+
+            {/* Event Creation Modal */}
+            {showEventModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                    <div className="bg-white rounded-2xl w-full max-w-md overflow-hidden shadow-xl animate-in zoom-in-95 duration-200">
+                        <div className="p-4 border-b border-gray-100 flex justify-between items-center">
+                            <h3 className="text-lg font-bold">Create Event</h3>
+                            <button onClick={() => setShowEventModal(false)} className="text-gray-400 hover:text-gray-600"><X size={24} /></button>
+                        </div>
+                        <div className="p-4 space-y-4">
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Event Title</label>
+                                <input
+                                    type="text"
+                                    value={newEvent.title}
+                                    onChange={e => setNewEvent({ ...newEvent, title: e.target.value })}
+                                    className="w-full bg-gray-50 rounded-xl px-4 py-2 text-sm border border-gray-200 outline-none focus:border-[#ff1744]"
+                                    placeholder="e.g. Weekly Meetup"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Description</label>
+                                <textarea
+                                    value={newEvent.description}
+                                    onChange={e => setNewEvent({ ...newEvent, description: e.target.value })}
+                                    className="w-full bg-gray-50 rounded-xl px-4 py-2 text-sm border border-gray-200 outline-none focus:border-[#ff1744] h-24 resize-none"
+                                    placeholder="What is this event about?"
+                                />
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Start Time</label>
+                                    <input
+                                        type="datetime-local"
+                                        value={newEvent.start_time}
+                                        onChange={e => setNewEvent({ ...newEvent, start_time: e.target.value })}
+                                        className="w-full bg-gray-50 rounded-xl px-4 py-2 text-sm border border-gray-200 outline-none focus:border-[#ff1744]"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Location</label>
+                                    <input
+                                        type="text"
+                                        value={newEvent.location}
+                                        onChange={e => setNewEvent({ ...newEvent, location: e.target.value })}
+                                        className="w-full bg-gray-50 rounded-xl px-4 py-2 text-sm border border-gray-200 outline-none focus:border-[#ff1744]"
+                                        placeholder="Online or Address"
+                                    />
+                                </div>
+                            </div>
+                            <button
+                                onClick={handleCreateEvent}
+                                disabled={!newEvent.title || !newEvent.start_time}
+                                className="w-full py-3 bg-[#ff1744] text-white font-bold rounded-xl hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                            >
+                                Create Event
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
         </div >
     );

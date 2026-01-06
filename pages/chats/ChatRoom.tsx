@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../../services/supabase';
 import { db, ChatMessageDB } from '../../services/db';
 import { useAuth } from '../../context/AuthContext';
+import { useTheme } from '../../context/ThemeContext';
 import MessageBubble, { ChatMessage } from '../../components/chat/MessageBubble';
 import ChatInput from '../../components/chat/ChatInput';
 import ForwardModal from '../../components/chat/ForwardModal';
@@ -11,7 +12,7 @@ import { useWebRTC } from '../../hooks/useWebRTC';
 import ErrorBoundary from '../../components/ErrorBoundary';
 import { cn } from '../../lib/utils';
 import {
-    ArrowLeft, Phone, Video, MoreVertical, Loader2, Clock, Trash2, Pin
+    ArrowLeft, Phone, Video, MoreVertical, Loader2, Clock, Trash2, Pin, ChevronDown, User, Image as ImageIcon, Ban, ShieldAlert
 } from 'lucide-react';
 
 interface Message extends ChatMessage {
@@ -31,6 +32,7 @@ const ChatRoom = () => {
     const chatId = id;
     const { user } = useAuth();
     const navigate = useNavigate();
+    const { chatWallpaper } = useTheme();
 
     // State
     const [messages, setMessages] = useState<Message[]>([]);
@@ -42,7 +44,16 @@ const ChatRoom = () => {
     const [isBuzzing, setIsBuzzing] = useState(false);
     const [typingUsers, setTypingUsers] = useState<Set<string>>(new Set());
     const [showScrollBottom, setShowScrollBottom] = useState(false);
-    const [participantStatus, setParticipantStatus] = useState('accepted'); // accepted, blocked, pending
+    const [participantStatus, setParticipantStatus] = useState<'accepted' | 'blocked' | 'blocked_by' | 'pending'>('accepted');
+    const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const [chatTimer, setChatTimer] = useState<number>(0);
+    const [showTimerModal, setShowTimerModal] = useState(false);
+    const [privacySettings, setPrivacySettings] = useState<{
+        last_seen_privacy: string;
+        online_status_privacy: string;
+        profile_photo_privacy: string;
+        about_privacy: string;
+    } | null>(null);
 
     // Call Hook
     const {
@@ -86,9 +97,14 @@ const ChatRoom = () => {
                 .from('chat_participants')
                 .select(`
                     profiles:user_id (
+                        id,
                         full_name,
                         avatar_url,
-                        username
+                        username,
+                        last_seen_privacy,
+                        online_status_privacy,
+                        profile_photo_privacy,
+                        about_privacy
                     )
                 `)
                 .eq('chat_id', chatId)
@@ -96,11 +112,31 @@ const ChatRoom = () => {
                 .single();
 
             if (participantData && participantData.profiles) {
-                // Supabase returns array or object depending on join, usually object if 1:1 relation or explicitly handled
-                // But here profiles is joined on user_id.
-                // Let's cast it or handle it safely.
-                const profile = Array.isArray(participantData.profiles) ? participantData.profiles[0] : participantData.profiles;
-                setChatProfile(profile as any);
+                const profile: any = Array.isArray(participantData.profiles) ? participantData.profiles[0] : participantData.profiles;
+                setChatProfile(profile);
+                setPrivacySettings({
+                    last_seen_privacy: profile.last_seen_privacy || 'everyone',
+                    online_status_privacy: profile.online_status_privacy || 'everyone',
+                    profile_photo_privacy: profile.profile_photo_privacy || 'everyone',
+                    about_privacy: profile.about_privacy || 'everyone',
+                });
+
+                // Check Block Status
+                const { data: blockData, error: blockError } = await supabase
+                    .from('blocked_users')
+                    .select('*')
+                    .or(`blocker_id.eq.${user.id},blocker_id.eq.${profile.id}`)
+                    .or(`blocked_id.eq.${user.id},blocked_id.eq.${profile.id}`);
+
+                if (blockData && blockData.length > 0) {
+                    const iBlockedThem = blockData.some(b => b.blocker_id === user.id);
+                    const theyBlockedMe = blockData.some(b => b.blocker_id === profile.id);
+
+                    if (iBlockedThem) setParticipantStatus('blocked');
+                    else if (theyBlockedMe) setParticipantStatus('blocked_by');
+                } else {
+                    setParticipantStatus('accepted');
+                }
             }
         } catch (e) {
             console.error("Error fetching chat profile", e);
@@ -237,10 +273,11 @@ const ChatRoom = () => {
 
         const handleNewMessage = (newMsgRaw: any) => {
             // Check for Buzz
+            // Check for Buzz
             if (newMsgRaw.type === 'buzz') {
                 setIsBuzzing(true);
-                if (navigator.vibrate) navigator.vibrate([100, 30, 100, 30, 100]);
-                setTimeout(() => setIsBuzzing(false), 1000);
+                if (navigator.vibrate) navigator.vibrate([200, 100, 200]); // Stronger pattern
+                setTimeout(() => setIsBuzzing(false), 500); // Match animation duration
             }
 
             // Mark incoming message as read since we are in the room
@@ -340,6 +377,10 @@ const ChatRoom = () => {
     // Handlers
     const handleSend = async (content: string, type: 'text' | 'image' | 'voice' | 'video' | 'file' | 'buzz' | 'location' | 'audio', file?: File, duration?: number, metadata?: any) => {
         if (!user || !chatId) return;
+        if (participantStatus === 'blocked' || participantStatus === 'blocked_by') {
+            alert("Cannot send message. User is blocked or has blocked you.");
+            return;
+        }
 
         try {
             let mediaUrl = '';
@@ -356,7 +397,15 @@ const ChatRoom = () => {
             }
 
             const finalMetadata = { ...metadata, duration };
-            if (replyTo) finalMetadata.replyToId = replyTo.id;
+            if (replyTo) {
+                finalMetadata.replyTo = {
+                    id: replyTo.id,
+                    text: replyTo.text,
+                    sender: replyTo.sender
+                };
+            }
+
+            const expiresAt = chatTimer > 0 ? new Date(Date.now() + chatTimer * 1000).toISOString() : null;
 
             const { error } = await supabase.from('messages').insert({
                 chat_id: chatId,
@@ -364,7 +413,8 @@ const ChatRoom = () => {
                 content: content,
                 type: type,
                 media_url: mediaUrl,
-                metadata: finalMetadata
+                metadata: finalMetadata,
+                expires_at: expiresAt
             });
 
             if (error) throw error;
@@ -374,6 +424,16 @@ const ChatRoom = () => {
             console.error("Send failed", e);
             alert("Failed to send message");
         }
+    };
+
+    const handleSwipeReply = (message: Message) => {
+        setReplyTo({
+            id: message.id,
+            text: message.text || (message.type === 'voice' ? 'Voice Message' : message.type === 'image' ? 'Image' : 'Media'),
+            sender: message.sender === 'me' ? 'me' : (chatProfile?.full_name || 'them')
+        });
+        // Wait for UI update then focus input? ChatInput handles focus if replyTo changes? Not explicitly.
+        // But the input is always there.
     };
 
     const handlePinMessage = async (msg: Message) => {
@@ -406,7 +466,6 @@ const ChatRoom = () => {
             // RPC is safer
             const { error } = await supabase.rpc('toggle_reaction', {
                 p_message_id: msgId,
-                p_user_id: user?.id,
                 p_reaction: reaction
             });
             // Realtime subscription should handle reaction updates if we listen to message_reactions? 
@@ -493,9 +552,66 @@ const ChatRoom = () => {
         } catch (e) { console.error(e); }
     };
 
+    const handleBlockUser = async () => {
+        if (!chatProfile || !user) return;
+        const isBlocked = participantStatus === 'blocked';
+        const action = isBlocked ? "Unblock" : "Block";
+
+        if (!confirm(`Are you sure you want to ${action.toLowerCase()} this user?`)) return;
+
+        try {
+            if (isBlocked) {
+                // Unblock
+                await supabase
+                    .from('blocked_users')
+                    .delete()
+                    .eq('blocker_id', user.id)
+                    .eq('blocked_id', (chatProfile as any).id); // profile object needs id
+                setParticipantStatus('accepted');
+                alert("User unblocked");
+            } else {
+                // Block
+                await supabase
+                    .from('blocked_users')
+                    .insert({ blocker_id: user.id, blocked_id: (chatProfile as any).id });
+                setParticipantStatus('blocked');
+                alert("User blocked");
+            }
+            setIsMenuOpen(false);
+        } catch (e) {
+            console.error("Block action failed", e);
+            alert("Failed to update block status");
+        }
+    };
+
+    const handleClearChat = async () => {
+        if (!confirm("Are you sure you want to clear this chat? This cannot be undone.")) return;
+        try {
+            // Soft delete or hard delete depending on policy. Hard delete for now as per user request context.
+            // Or updating is_deleted for all messages matchin chat_id
+            const { error } = await supabase
+                .from('messages')
+                .delete()
+                .eq('chat_id', chatId);
+
+            if (error) throw error;
+            setMessages([]);
+            db.messages.where({ chat_id: chatId }).delete();
+            setIsMenuOpen(false);
+            alert("Chat cleared.");
+        } catch (e) {
+            console.error("Failed to clear chat", e);
+            alert("Failed to clear chat");
+        }
+    };
+
     return (
         <ErrorBoundary>
-            <div className={cn("flex flex-col h-[100dvh] w-full max-w-full bg-[#f0f2f5] dark:bg-black transition-transform fixed inset-0 overflow-hidden", isBuzzing && "animate-[spin_0.5s_ease-in-out]")}>
+            <div className={cn("flex flex-col h-[100dvh] w-full max-w-full bg-[#f0f2f5] dark:bg-black transition-transform fixed inset-0 overflow-hidden", isBuzzing && "animate-shake")}>
+                {/* Menu Backdrop */}
+                {isMenuOpen && (
+                    <div className="fixed inset-0 z-40 bg-transparent" onClick={() => setIsMenuOpen(false)} />
+                )}
 
                 <CallOverlay
                     isOpen={callState !== 'idle'}
@@ -514,7 +630,7 @@ const ChatRoom = () => {
                     onHangup={endCall}
                 />
 
-                <div className={cn("flex flex-col h-full bg-inherit", isBuzzing && "animate-[shake_0.5s_ease-in-out_infinite]")}>
+                <div className={cn("flex flex-col h-full bg-inherit", isBuzzing && "animate-shake")}>
                     {/* Header */}
                     <header className="px-2 py-3 bg-white dark:bg-gray-900 flex items-center justify-between shadow-sm z-50 border-b border-gray-100 dark:border-gray-800 absolute top-0 w-full">
                         <div className="flex items-center gap-2">
@@ -522,27 +638,80 @@ const ChatRoom = () => {
                                 <ArrowLeft size={20} className="text-gray-600 dark:text-gray-300" />
                             </button>
                             {/* Avatar and Name */}
-                            <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate(`/profile/${chatId}`)}>
+                            <div className="flex items-center gap-2 cursor-pointer" onClick={() => chatProfile?.id && navigate(`/user/${chatProfile.id}`)}>
                                 <div className="relative">
                                     <img
-                                        src={chatProfile?.avatar_url || `https://ui-avatars.com/api/?name=${chatProfile?.full_name || 'User'}&background=random`}
+                                        src={
+                                            (privacySettings?.profile_photo_privacy === 'nobody' || (privacySettings?.profile_photo_privacy === 'contacts' && false)) // TODO: Check contacts
+                                                ? `https://ui-avatars.com/api/?name=${chatProfile?.full_name?.charAt(0) || 'U'}&background=random`
+                                                : (chatProfile?.avatar_url || `https://ui-avatars.com/api/?name=${chatProfile?.full_name || 'User'}&background=random`)
+                                        }
                                         className="w-10 h-10 rounded-full object-cover bg-gray-200"
                                         alt={chatProfile?.full_name || 'User'}
                                     />
-                                    <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 border-2 border-white dark:border-gray-900 rounded-full"></span>
+                                    {privacySettings?.online_status_privacy !== 'nobody' && (
+                                        <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 border-2 border-white dark:border-gray-900 rounded-full"></span>
+                                    )}
                                 </div>
                                 <div>
                                     <h2 className="font-bold text-sm text-gray-900 dark:text-white">
                                         {chatProfile?.full_name || "Loading..."}
                                     </h2>
-                                    <span className="text-xs text-green-500">Online</span>
+                                    {typingUsers.size > 0 ? (
+                                        <span className="text-xs font-bold text-[#ff1744] animate-pulse">
+                                            Typing...
+                                        </span>
+                                    ) : (
+                                        privacySettings?.online_status_privacy !== 'nobody' && (
+                                            <span className="text-xs text-green-500">Online</span>
+                                        )
+                                    )}
                                 </div>
                             </div>
                         </div>
                         <div className="flex items-center gap-4">
                             <button onClick={() => startCall(chatId || '', 'User', '', false)}><Phone size={20} className="text-gray-600 dark:text-gray-300" /></button>
                             <button onClick={() => startCall(chatId || '', 'User', '', true)}><Video size={20} className="text-gray-600 dark:text-gray-300" /></button>
-                            <button><MoreVertical size={20} className="text-gray-600 dark:text-gray-300" /></button>
+                            <div className="relative">
+                                <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors">
+                                    <MoreVertical size={20} className="text-gray-600 dark:text-gray-300" />
+                                </button>
+                                {isMenuOpen && (
+                                    <div className="absolute right-0 top-12 w-48 bg-white dark:bg-gray-900 rounded-xl shadow-xl border border-gray-100 dark:border-gray-800 py-1 z-50 animate-in fade-in zoom-in-95 duration-200">
+                                        <button
+                                            onClick={() => { navigate(`/user/${chatId}`); setIsMenuOpen(false); }}
+                                            className="w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center gap-3 text-sm text-gray-700 dark:text-gray-200"
+                                        >
+                                            <User size={16} /> View Contact
+                                        </button>
+                                        <button
+                                            onClick={() => { navigate('/settings/appearance'); setIsMenuOpen(false); }}
+                                            className="w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center gap-3 text-sm text-gray-700 dark:text-gray-200"
+                                        >
+                                            <ImageIcon size={16} /> Wallpaper
+                                        </button>
+                                        <button
+                                            onClick={handleClearChat}
+                                            className="w-full text-left px-4 py-3 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-3 text-sm text-red-600"
+                                        >
+                                            <Trash2 size={16} /> Clear Chat
+                                        </button>
+                                        <button
+                                            onClick={() => { setShowTimerModal(true); setIsMenuOpen(false); }}
+                                            className="w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center gap-3 text-sm text-gray-700 dark:text-gray-200"
+                                        >
+                                            <Clock size={16} /> Disappearing Messages
+                                        </button>
+                                        <button
+                                            onClick={() => { handleBlockUser(); }}
+                                            className="w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center gap-3 text-sm text-gray-700 dark:text-gray-200"
+                                        >
+                                            {participantStatus === 'blocked' ? <ShieldAlert size={16} /> : <Ban size={16} />}
+                                            {participantStatus === 'blocked' ? "Unblock User" : "Block User"}
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     </header>
 
@@ -575,7 +744,8 @@ const ChatRoom = () => {
                     <div
                         ref={listRef}
                         onScroll={handleScroll}
-                        className={cn("flex-1 overflow-y-auto overflow-x-hidden px-2 py-4 pt-20 bg-[#e5ddd5] dark:bg-black relative", pinnedMessages.length > 0 && "pt-32")}
+                        className={cn("flex-1 overflow-y-auto overflow-x-hidden px-2 py-4 pt-20 relative", pinnedMessages.length > 0 && "pt-32")}
+                        style={{ background: chatWallpaper }}
                     >
                         {loading && <div className="flex justify-center py-4"><Loader2 className="animate-spin text-gray-400" /></div>}
 
@@ -584,7 +754,7 @@ const ChatRoom = () => {
                                 <MessageBubble
                                     message={msg}
                                     onReact={handleReaction}
-                                    onSwipeReply={setReplyTo}
+                                    onSwipeReply={handleSwipeReply}
                                     onEdit={handleEditMessage}
                                     onDelete={handleDeleteMessage}
                                     onForward={setForwardingMessage}
@@ -595,16 +765,7 @@ const ChatRoom = () => {
                             </div>
                         ))}
 
-                        {typingUsers.size > 0 && (
-                            <div className="flex items-center gap-2 text-xs text-gray-500 ml-4 mb-2 animate-pulse">
-                                <div className="flex gap-1">
-                                    <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce delay-0" />
-                                    <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce delay-100" />
-                                    <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce delay-200" />
-                                </div>
-                                <span>{Array.from(typingUsers).join(', ')} is typing...</span>
-                            </div>
-                        )}
+
 
                         <div className="h-4" /> {/* Spacer */}
                     </div>
@@ -612,9 +773,9 @@ const ChatRoom = () => {
                     {showScrollBottom && (
                         <button
                             onClick={scrollToBottom}
-                            className="fixed bottom-32 right-4 bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-300 p-3 rounded-full shadow-lg border border-gray-200 dark:border-gray-700 z-[100] animate-in fade-in zoom-in duration-200 hover:scale-110 transition-transform"
+                            className="fixed bottom-32 right-4 bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-300 h-10 w-10 flex items-center justify-center rounded-full shadow-lg border border-gray-200 dark:border-gray-700 z-[100] animate-in fade-in zoom-in duration-200 hover:scale-110 transition-transform"
                         >
-                            <Clock size={24} className="rotate-180" /> {/* Chevron replacement */}
+                            <ChevronDown size={24} />
                         </button>
                     )}
 
@@ -629,7 +790,13 @@ const ChatRoom = () => {
                     ) : !loading && (
                         <div className="p-6 bg-white border-t border-gray-200 text-center safe-bottom">
                             <p className="text-gray-500">
-                                {participantStatus === 'blocked' ? "You have blocked this user." : "Request pending."}
+                                <p className="text-gray-500">
+                                    {participantStatus === 'blocked'
+                                        ? "You have blocked this user."
+                                        : participantStatus === 'blocked_by'
+                                            ? "You can no longer send messages to this user."
+                                            : "Request pending."}
+                                </p>
                             </p>
                         </div>
                     )}
@@ -681,6 +848,45 @@ const ChatRoom = () => {
                         </div>
                     )
                 }
+                {/* Timer Modal */}
+                {showTimerModal && (
+                    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                        <div className="bg-white dark:bg-gray-900 rounded-2xl w-full max-w-sm overflow-hidden shadow-xl animate-in zoom-in-95 duration-200">
+                            <div className="p-4 border-b border-gray-100 dark:border-gray-800">
+                                <h3 className="text-lg font-bold text-gray-900 dark:text-white">Disappearing Messages</h3>
+                                <p className="text-sm text-gray-500 dark:text-gray-400">
+                                    Messages in this chat will disappear after:
+                                </p>
+                            </div>
+                            <div className="p-2">
+                                {[
+                                    { label: '24 Hours', value: 24 * 60 * 60 },
+                                    { label: '7 Days', value: 7 * 24 * 60 * 60 },
+                                    { label: '90 Days', value: 90 * 24 * 60 * 60 },
+                                    { label: 'Off', value: 0 },
+                                ].map((option) => (
+                                    <button
+                                        key={option.value}
+                                        onClick={() => {
+                                            setChatTimer(option.value);
+                                            // TODO: Persist this to chat settings in DB if desired
+                                            setShowTimerModal(false);
+                                        }}
+                                        className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                                    >
+                                        <span className="text-gray-900 dark:text-white font-medium">{option.label}</span>
+                                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${chatTimer === option.value ? 'border-[#ff1744] bg-[#ff1744]' : 'border-gray-300 dark:border-gray-600'}`}>
+                                            {chatTimer === option.value && <div className="w-2 h-2 bg-white rounded-full" />}
+                                        </div>
+                                    </button>
+                                ))}
+                            </div>
+                            <div className="p-4 bg-gray-50 dark:bg-gray-800/50 text-center">
+                                <button onClick={() => setShowTimerModal(false)} className="text-[#ff1744] font-medium text-sm">Cancel</button>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div >
         </ErrorBoundary >
     );
