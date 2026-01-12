@@ -16,6 +16,8 @@ import {
     ArrowLeft, Phone, Video, MoreVertical, Loader2, Clock, Trash2, Pin, ChevronDown, User, Image as ImageIcon, Ban, ShieldAlert
 } from 'lucide-react';
 import { useNotifications } from '../../context/NotificationContext';
+import { BadgeIcon } from '../../components/BadgeIcon';
+import { BadgeType } from '../../src/constants/badges';
 
 interface Message extends ChatMessage {
     // Extended properties if needed, currently matching ChatMessage
@@ -111,6 +113,7 @@ const ChatRoom = () => {
                         full_name,
                         avatar_url,
                         username,
+                        badge_type,
                         last_seen_at,
                         last_seen_privacy,
                         online_status_privacy,
@@ -852,6 +855,11 @@ const ChatRoom = () => {
                                     />
                                     {privacySettings?.online_status_privacy !== 'nobody' && (
                                         <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 border-2 border-white dark:border-gray-900 rounded-full"></span>
+                                    )}
+                                    {chatProfile?.badge_type && (
+                                        <div className="absolute bottom-0 right-0 z-10 scale-90">
+                                            <BadgeIcon type={chatProfile.badge_type as BadgeType} size={16} className="p-0.5" />
+                                        </div>
                                     )}
                                 </div>
                                 <div>

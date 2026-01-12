@@ -45,7 +45,9 @@ const FeedView: React.FC = () => {
                 full_name,
                 username,
                 avatar_url,
-                is_verified
+                avatar_url,
+                is_verified,
+                badge_type
             ),
             post_likes(user_id)
         `)
@@ -105,6 +107,7 @@ const FeedView: React.FC = () => {
           username: item.profiles?.username || 'user',
           avatar: item.profiles?.avatar_url || '',
           isVerified: item.profiles?.is_verified || false,
+          badge_type: item.profiles?.badge_type
         },
         content: item.content,
         timestamp: new Date(item.created_at).toLocaleDateString(),

@@ -9,6 +9,7 @@ export interface Post {
     username: string;
     avatar: string;
     isVerified: boolean;
+    badge_type?: 'blue' | 'creator' | 'business' | 'elite' | 'education' | 'founder';
   };
   content: string;
   timestamp: string;
@@ -42,6 +43,7 @@ export interface Story {
   user?: {
     username: string;
     avatar_url: string;
+    badge_type?: 'blue' | 'creator' | 'business' | 'elite' | 'education' | 'founder';
   };
   media_url?: string;
   content?: string;
@@ -94,6 +96,7 @@ export interface Comment {
     full_name: string;
     avatar_url: string;
     username: string;
+    badge_type?: 'blue' | 'creator' | 'business' | 'elite' | 'education' | 'founder';
   };
   children?: Comment[];
 }

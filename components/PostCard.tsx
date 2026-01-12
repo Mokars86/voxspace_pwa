@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Heart, MessageCircle, Repeat, Share, MoreHorizontal, BadgeCheck, Trash2, Edit2, Send, X, Music, MapPin, Lock, Download } from 'lucide-react';
+import { Heart, MessageCircle, Repeat, Share, MoreHorizontal, Trash2, Edit2, Send, X, Music, MapPin, Lock, Download } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Post, Comment } from '../types';
 import { supabase } from '../services/supabase';
@@ -8,6 +8,8 @@ import { useAuth } from '../context/AuthContext';
 import RepostModal from './RepostModal';
 import { db } from '../services/db';
 import { MyBagItem } from '../types/mybag';
+import { BadgeIcon } from './BadgeIcon';
+import { BadgeType } from '../src/constants/badges';
 
 interface PostCardProps {
     post: Post;
@@ -26,11 +28,18 @@ interface CommentItemProps {
 
 const CommentItem: React.FC<CommentItemProps> = ({ comment, depth = 0, currentUserId, onDelete, onReply }) => (
     <div className={`flex gap-3 group mt-4 ${depth > 0 ? 'ml-4 sm:ml-8 md:ml-12 border-l-2 border-gray-100 dark:border-gray-800 pl-4' : ''}`}>
-        <img
-            src={comment.profiles?.avatar_url || `https://ui-avatars.com/api/?name=${comment.profiles?.full_name}`}
-            className="w-8 h-8 rounded-full object-cover border border-gray-100 dark:border-gray-700"
-            alt={comment.profiles?.full_name || 'User'}
-        />
+        <div className="relative flex-shrink-0 w-8 h-8">
+            <img
+                src={comment.profiles?.avatar_url || `https://ui-avatars.com/api/?name=${comment.profiles?.full_name}`}
+                className="w-full h-full rounded-full object-cover border border-gray-100 dark:border-gray-700"
+                alt={comment.profiles?.full_name || 'User'}
+            />
+            {comment.profiles?.badge_type && (
+                <div className="absolute bottom-0 right-0 z-10 scale-75">
+                    <BadgeIcon type={comment.profiles.badge_type as BadgeType} size={16} className="p-0.5" />
+                </div>
+            )}
+        </div>
         <div className="flex-1 min-w-0">
             <div className="bg-gray-50 dark:bg-gray-800 rounded-2xl p-3 px-4 relative">
                 <div className="flex justify-between items-start">
@@ -73,7 +82,7 @@ const CommentItem: React.FC<CommentItemProps> = ({ comment, depth = 0, currentUs
 
 const PostCard: React.FC<PostCardProps> = ({ post, onDelete, onPin, onMediaClick }) => {
     const navigate = useNavigate();
-    const { user } = useAuth();
+    const { user, profile } = useAuth();
     const [liked, setLiked] = useState(post.isLiked || false);
     const [likeCount, setLikeCount] = useState(post.likes);
     const [repostCount, setRepostCount] = useState(post.reposts || 0);
@@ -224,7 +233,7 @@ const PostCard: React.FC<PostCardProps> = ({ post, onDelete, onPin, onMediaClick
             // Opening comments
             const { data } = await supabase
                 .from('comments')
-                .select('*, profiles(full_name, avatar_url, username)')
+                .select('*, profiles(full_name, avatar_url, username, badge_type)')
                 .eq('post_id', post.id)
                 .order('created_at', { ascending: true });
             if (data) setComments(data);
@@ -245,7 +254,8 @@ const PostCard: React.FC<PostCardProps> = ({ post, onDelete, onPin, onMediaClick
             profiles: {
                 full_name: user.user_metadata?.full_name || 'Me',
                 avatar_url: user.user_metadata?.avatar_url || '',
-                username: 'me'
+                username: 'me',
+                badge_type: profile?.badge_type // Use profile from context
             }
         };
 
@@ -263,7 +273,7 @@ const PostCard: React.FC<PostCardProps> = ({ post, onDelete, onPin, onMediaClick
                     content: optimisticComment.content,
                     parent_id: replyingTo
                 })
-                .select('*, profiles(full_name, avatar_url, username)')
+                .select('*, profiles(full_name, avatar_url, username, badge_type)')
                 .single();
 
             if (error) throw error;
@@ -314,7 +324,7 @@ const PostCard: React.FC<PostCardProps> = ({ post, onDelete, onPin, onMediaClick
             <div className="flex p-4 gap-3">
                 {/* Avatar */}
                 <div
-                    className="flex-shrink-0"
+                    className="flex-shrink-0 relative"
                     onClick={(e) => {
                         e.stopPropagation();
                         navigate(`/user/${post.author.id}`);
@@ -329,6 +339,11 @@ const PostCard: React.FC<PostCardProps> = ({ post, onDelete, onPin, onMediaClick
                             </div>
                         )}
                     </div>
+                    {post.author.badge_type && (
+                        <div className="absolute bottom-0 right-0 z-10">
+                            <BadgeIcon type={post.author.badge_type as BadgeType} size={14} className="p-0.5" />
+                        </div>
+                    )}
                 </div>
 
                 {/* Content */}
@@ -337,7 +352,7 @@ const PostCard: React.FC<PostCardProps> = ({ post, onDelete, onPin, onMediaClick
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-1 min-w-0" onClick={(e) => { e.stopPropagation(); navigate(`/user/${post.author.id}`); }}>
                             <h3 className="font-bold text-gray-900 dark:text-white truncate hover:underline">{post.author.name}</h3>
-                            {post.author.isVerified && <BadgeCheck size={14} className="text-[#ff1744] fill-current" />}
+                            {/* REMOVED BadgeCheck from here to match Profile style */}
                             <span className="text-gray-500 text-sm truncate">@{post.author.username}</span>
                             <span className="text-gray-400 text-xs whitespace-nowrap">· {post.timestamp}</span>
                             {post.is_pinned && <span className="text-xs text-[#ff1744] font-bold ml-2">📌 Pinned</span>}
@@ -472,7 +487,9 @@ const PostCard: React.FC<PostCardProps> = ({ post, onDelete, onPin, onMediaClick
                         </button>
 
                         <button
-                            onClick={handleLike}
+                            onClick={(e) => {
+                                handleLike(e);
+                            }}
                             className={cn(
                                 "flex items-center gap-2 group transition-colors text-sm",
                                 liked ? "text-[#ff1744]" : "hover:text-[#ff1744]"
@@ -511,8 +528,15 @@ const PostCard: React.FC<PostCardProps> = ({ post, onDelete, onPin, onMediaClick
                         <div className="mt-4 pt-4 border-t border-gray-50 dark:border-gray-800 animate-in slide-in-from-top-2">
                             {/* Comment Input */}
                             <div className="flex gap-3 mb-4 items-start">
-                                <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 flex-shrink-0 overflow-hidden">
-                                    {user?.user_metadata?.avatar_url && <img src={user.user_metadata.avatar_url} className="w-full h-full object-cover" />}
+                                <div className="relative w-8 h-8 flex-shrink-0">
+                                    <div className="w-full h-full rounded-full bg-gray-200 dark:bg-gray-700  overflow-hidden">
+                                        {user?.user_metadata?.avatar_url && <img src={user.user_metadata.avatar_url} className="w-full h-full object-cover" />}
+                                    </div>
+                                    {profile?.badge_type && (
+                                        <div className="absolute bottom-0 right-0 z-10 scale-75">
+                                            <BadgeIcon type={profile.badge_type} size={16} className="p-0.5" />
+                                        </div>
+                                    )}
                                 </div>
                                 <div className="flex-1">
                                     {replyingTo && (

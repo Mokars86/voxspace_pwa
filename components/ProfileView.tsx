@@ -8,6 +8,8 @@ import { supabase } from '../services/supabase';
 import { useNavigate, Link as RouterLink } from 'react-router-dom';
 import ImageViewer from './ImageViewer';
 import QRCodeModal from './QRCodeModal';
+import { BadgeIcon } from './BadgeIcon';
+import { BadgeType } from '../src/constants/badges';
 
 interface ProfileData {
   full_name: string;
@@ -19,6 +21,7 @@ interface ProfileData {
   created_at: string;
   followers_count: number;
   following_count: number;
+  badge_type?: BadgeType;
 }
 
 const ProfileView: React.FC = () => {
@@ -118,7 +121,7 @@ const ProfileView: React.FC = () => {
         <div className="flex justify-between items-end -mt-10 mb-4">
           <button
             onClick={() => displayProfile.avatar_url && setPreviewImage(displayProfile.avatar_url)}
-            className={`rounded-full ${displayProfile.avatar_url ? 'cursor-pointer' : 'cursor-default'}`}
+            className={`relative rounded-full ${displayProfile.avatar_url ? 'cursor-pointer' : 'cursor-default'}`}
             disabled={!displayProfile.avatar_url}
           >
             <img
@@ -126,6 +129,11 @@ const ProfileView: React.FC = () => {
               alt="Profile"
               className="w-20 h-20 rounded-full border-4 border-white dark:border-gray-900 object-cover hover:opacity-90 transition-opacity"
             />
+            {displayProfile.badge_type && (
+              <div className="absolute bottom-1 right-1 z-10">
+                <BadgeIcon type={displayProfile.badge_type} size={20} className="p-0.5" />
+              </div>
+            )}
           </button>
           <button
             onClick={() => navigate('/settings')}
@@ -136,7 +144,9 @@ const ProfileView: React.FC = () => {
         </div>
 
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{displayProfile.full_name}</h1>
+          <div className="flex items-center gap-1">
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{displayProfile.full_name}</h1>
+          </div>
           <p className="text-gray-500 dark:text-gray-400 text-sm mb-3">@{displayProfile.username}</p>
           <p className="text-gray-900 dark:text-gray-100 mb-3 whitespace-pre-wrap">
             {displayProfile.bio || "No bio yet."}

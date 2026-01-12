@@ -5,9 +5,11 @@ import { useAuth } from '../context/AuthContext';
 import { Story } from '../types';
 import StoryViewer from './StoryViewer';
 import CreateStoryModal from './CreateStoryModal';
+import { BadgeIcon } from './BadgeIcon';
+import { BadgeType } from '../src/constants/badges';
 
 const StoryBar: React.FC = () => {
-    const { user } = useAuth();
+    const { user, profile } = useAuth(); // Use profile for my badge
     const [stories, setStories] = useState<Story[]>([]);
     const [myStories, setMyStories] = useState<Story[]>([]);
     const [viewerOpen, setViewerOpen] = useState(false);
@@ -30,7 +32,8 @@ const StoryBar: React.FC = () => {
           *,
           user:user_id (
             username,
-            avatar_url
+            avatar_url,
+            badge_type
           )
         `)
                 .gt('expires_at', new Date().toISOString())
@@ -101,6 +104,11 @@ const StoryBar: React.FC = () => {
                                 alt="Me"
                             />
                         </div>
+                        {profile?.badge_type && (
+                            <div className="absolute bottom-0 right-0 z-20">
+                                <BadgeIcon type={profile.badge_type} size={14} className="p-0.5" />
+                            </div>
+                        )}
                     </div>
 
                     {/* Always visible Add Button */}
@@ -119,12 +127,19 @@ const StoryBar: React.FC = () => {
                     const firstStory = userStories[0];
                     return (
                         <div key={userId} className="flex flex-col items-center gap-1 cursor-pointer min-w-[72px] h-[90px]" onClick={() => openStory(userId)}>
-                            <div className="w-[68px] h-[68px] rounded-full p-[2px] bg-gradient-to-tr from-[#ff1744] to-yellow-500">
-                                <img
-                                    src={firstStory.user?.avatar_url || `https://ui-avatars.com/api/?name=${firstStory.user?.username}`}
-                                    className="w-full h-full rounded-full object-cover border-2 border-white dark:border-gray-900"
-                                    alt={firstStory.user?.username}
-                                />
+                            <div className="relative w-[68px] h-[68px]">
+                                <div className="w-full h-full rounded-full p-[2px] bg-gradient-to-tr from-[#ff1744] to-yellow-500">
+                                    <img
+                                        src={firstStory.user?.avatar_url || `https://ui-avatars.com/api/?name=${firstStory.user?.username}`}
+                                        className="w-full h-full rounded-full object-cover border-2 border-white dark:border-gray-900"
+                                        alt={firstStory.user?.username}
+                                    />
+                                </div>
+                                {firstStory.user?.badge_type && (
+                                    <div className="absolute bottom-0 right-0 z-10">
+                                        <BadgeIcon type={firstStory.user.badge_type as BadgeType} size={16} className="p-0.5" />
+                                    </div>
+                                )}
                             </div>
                             <span className="text-xs font-medium text-gray-700 dark:text-gray-300 w-full text-center truncate px-1">
                                 {firstStory.user?.username}

@@ -2,10 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../context/AuthContext';
-import { ArrowLeft, MessageSquare, Calendar, MapPin, Link as LinkIcon, Loader2, MoreVertical, Ban, ShieldAlert } from 'lucide-react';
+import { ArrowLeft, MessageSquare, Calendar, Link as LinkIcon, Loader2, MoreVertical, Ban, ShieldAlert } from 'lucide-react';
 import PostCard from '../components/PostCard';
 import { Post } from '../types';
 import ImageViewer from '../components/ImageViewer';
+import { BadgeIcon } from '../components/BadgeIcon';
+import { BadgeType } from '../src/constants/badges';
 
 interface ProfileData {
     id: string;
@@ -17,6 +19,7 @@ interface ProfileData {
     created_at: string;
     profile_photo_privacy?: 'everyone' | 'contacts' | 'nobody';
     about_privacy?: 'everyone' | 'contacts' | 'nobody';
+    badge_type?: BadgeType;
 }
 
 const UserProfile: React.FC = () => {
@@ -30,7 +33,7 @@ const UserProfile: React.FC = () => {
     const [isFollowing, setIsFollowing] = useState(false);
     const [followLoading, setFollowLoading] = useState(false);
 
-    const [messingLoading, setMessagingLoading] = useState(false);
+    const [messagingLoading, setMessagingLoading] = useState(false);
     const [previewImage, setPreviewImage] = useState<string | null>(null);
     const [isBlocked, setIsBlocked] = useState(false);
     const [showMenu, setShowMenu] = useState(false);
@@ -89,13 +92,15 @@ const UserProfile: React.FC = () => {
                         username: data.username,
                         avatar: data.avatar_url,
                         isVerified: false,
+                        badge_type: data.badge_type,
                     },
                     content: item.content,
                     timestamp: new Date(item.created_at).toLocaleDateString(),
                     likes: item.likes_count || 0,
                     comments: item.comments_count || 0,
                     reposts: item.reposts_count || 0,
-                    media: item.media_url
+                    media: item.media_url,
+                    media_type: item.media_type
                 }));
                 setPosts(formattedPosts);
 
@@ -245,7 +250,7 @@ const UserProfile: React.FC = () => {
                 <div className="flex justify-between items-end -mt-10 mb-4">
                     <button
                         onClick={() => profile.avatar_url && setPreviewImage(profile.avatar_url)}
-                        className={`rounded-full ${profile.avatar_url ? 'cursor-pointer' : 'cursor-default'}`}
+                        className={`relative rounded-full ${profile.avatar_url ? 'cursor-pointer' : 'cursor-default'}`}
                         disabled={!profile.avatar_url}
                     >
                         <img
@@ -255,6 +260,11 @@ const UserProfile: React.FC = () => {
                             alt="Profile"
                             className="w-20 h-20 rounded-full border-4 border-white object-cover shadow-sm bg-white hover:opacity-90 transition-opacity"
                         />
+                        {profile.badge_type && (
+                            <div className="absolute bottom-1 right-1 z-10">
+                                <BadgeIcon type={profile.badge_type} size={20} className="p-0.5" />
+                            </div>
+                        )}
                     </button>
                     <div className="flex gap-2">
                         {isOwnProfile ? (
@@ -265,10 +275,10 @@ const UserProfile: React.FC = () => {
                             <>
                                 <button
                                     onClick={handleMessage}
-                                    disabled={messingLoading}
+                                    disabled={messagingLoading}
                                     className="p-2 border border-gray-200 rounded-full text-gray-600 hover:bg-gray-50 flex items-center justify-center"
                                 >
-                                    {messingLoading ? <Loader2 size={16} className="animate-spin" /> : <MessageSquare size={18} />}
+                                    {messagingLoading ? <Loader2 size={16} className="animate-spin" /> : <MessageSquare size={18} />}
                                 </button>
                                 <button
                                     onClick={handleFollowToggle}
@@ -287,7 +297,9 @@ const UserProfile: React.FC = () => {
                 </div>
 
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900">{profile.full_name}</h1>
+                    <div className="flex items-center gap-1">
+                        <h1 className="text-2xl font-bold text-gray-900">{profile.full_name}</h1>
+                    </div>
                     <p className="text-gray-500 text-sm mb-3">@{profile.username}</p>
                     <p className="text-gray-900 mb-3 whitespace-pre-wrap">
                         {showBio ? (profile.bio || "No bio yet.") : <span className="text-gray-400 italic">Bio hidden</span>}
