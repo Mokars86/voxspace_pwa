@@ -17,6 +17,7 @@ const ChatView: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'all' | 'requests' | 'archived'>((location.state as any)?.tab || 'all');
   const [viewMode, setViewMode] = useState<'chats' | 'calls'>('chats');
   const [callLogs, setCallLogs] = useState<any[]>([]);
+  const [missedCallsCount, setMissedCallsCount] = useState(0);
 
   // Lock specific state
   const [pinModal, setPinModal] = useState<{ isOpen: boolean, mode: 'create' | 'enter' | 'confirm', chatId?: string, action?: 'open' | 'toggleLock' }>({ isOpen: false, mode: 'enter' });
@@ -53,11 +54,36 @@ const ChatView: React.FC = () => {
     }
   };
 
+  const fetchMissedCallsCount = async () => {
+    if (!user) return;
+    try {
+      // Count missed incoming calls 
+      // Assuming 'status' is 'missed' and caller is NOT me.
+      const { count, error } = await supabase
+        .from('call_logs')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'missed')
+        .neq('caller_id', user.id);
+
+      if (!error && count !== null) {
+        setMissedCallsCount(count);
+      }
+    } catch (e) {
+      console.error("Error fetching missed calls count", e);
+    }
+  };
+
   useEffect(() => {
     if (viewMode === 'chats') {
       fetchChats();
+      fetchMissedCallsCount();
     } else {
+      // When entering calls view, we might want to reset the count or keep it?
+      // Usually reset if viewed. For now just fetch logs.
       fetchCallLogs();
+      // Optionally mark as viewed to clear count? 
+      // For now let's keep it simple: just fetch.
+      fetchMissedCallsCount(); // Keep count updated
     }
   }, [user, viewMode]);
 
@@ -206,8 +232,20 @@ const ChatView: React.FC = () => {
       )
       .subscribe();
 
+    // Separate channel for call logs maybe? Or just poll/fetch on mount.
+    // Ideally we listen to call_logs inserts too.
+    const callChannel = supabase
+      .channel('call_notifications')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'call_logs' },
+        () => fetchMissedCallsCount()
+      )
+      .subscribe();
+
     return () => {
       supabase.removeChannel(channel);
+      supabase.removeChannel(callChannel);
     };
   }, [user, viewMode]);
 
@@ -425,6 +463,11 @@ const ChatView: React.FC = () => {
                 className={cn("p-1.5 rounded-md transition-all", viewMode === 'calls' ? "bg-white dark:bg-gray-700 shadow-sm" : "text-gray-400")}
               >
                 <Phone size={16} />
+                {missedCallsCount > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 bg-[#ff1744] text-white text-[10px] min-w-[16px] h-[16px] flex items-center justify-center rounded-full border-2 border-white dark:border-gray-800 shadow-sm animate-in zoom-in font-bold">
+                    {missedCallsCount}
+                  </span>
+                )}
               </button>
             </div>
           </div>
@@ -442,6 +485,11 @@ const ChatView: React.FC = () => {
                 className={cn("px-4 py-1 rounded-full text-xs font-bold transition-all", activeTab === 'requests' ? "bg-white dark:bg-gray-700 text-black dark:text-white shadow-sm" : "text-gray-500 dark:text-gray-400")}
               >
                 Requests
+                {chats.filter(c => c.status === 'pending').length > 0 && (
+                  <span className="ml-2 bg-[#ff1744] text-white text-[10px] px-2 py-0.5 rounded-full shadow-sm animate-in zoom-in">
+                    {chats.filter(c => c.status === 'pending').length}
+                  </span>
+                )}
               </button>
 
             </div>

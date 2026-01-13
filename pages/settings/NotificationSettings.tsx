@@ -119,6 +119,7 @@ const SoundSelector = () => {
         { id: 'pop', name: 'Pop' },
         { id: 'chime', name: 'Chime' },
         { id: 'level_up', name: 'Level Up' },
+        { id: 'airbus', name: 'Airbus' },
         { id: 'none', name: 'None' },
     ];
 
@@ -138,8 +139,8 @@ const SoundSelector = () => {
                         playPreview(sound.id);
                     }}
                     className={`w-full flex items-center justify-between p-3 rounded-xl transition-all ${sentMessageSound === sound.id
-                            ? 'bg-white dark:bg-gray-800 border-2 border-[#ff1744] shadow-sm'
-                            : 'bg-white dark:bg-gray-900 border border-transparent hover:bg-gray-100 dark:hover:bg-gray-800'
+                        ? 'bg-white dark:bg-gray-800 border-2 border-[#ff1744] shadow-sm'
+                        : 'bg-white dark:bg-gray-900 border border-transparent hover:bg-gray-100 dark:hover:bg-gray-800'
                         }`}
                 >
                     <div className="flex items-center gap-3">

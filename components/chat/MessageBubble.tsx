@@ -23,6 +23,7 @@ export interface ChatMessage {
     viewOnce?: boolean;
     isViewed?: boolean;
     isPinned?: boolean;
+    createdAt?: string; // Full ISO string for date separators
 }
 
 export interface MessageProps {
@@ -33,7 +34,7 @@ export interface MessageProps {
     onEdit?: (msgId: string, newText: string) => void;
     onDelete?: (msgId: string) => void;
     onForward?: (msg: any) => void;
-    onMediaClick?: (url: string, type: 'image' | 'video', allUrls?: string[]) => void;
+    onMediaClick?: (url: string, type: 'image' | 'video' | 'file', allUrls?: string[]) => void;
     onViewOnce?: (msg: ChatMessage) => void;
     onPin?: (msg: ChatMessage) => void;
     onSaveToBag?: (msg: ChatMessage) => void;
@@ -434,23 +435,46 @@ const MessageBubble: React.FC<MessageProps> = ({ message, onSwipeReply, onReact,
 
                             {/* Media: File (Generic) */}
                             {message.type === 'file' && (
-                                <a href={message.mediaUrl} target="_blank" rel="noreferrer" className={cn(
-                                    "flex items-center gap-3 p-3 rounded-xl mb-1 transition-colors",
-                                    isMe ? "bg-white/20 hover:bg-white/30" : "bg-gray-100 hover:bg-gray-200"
-                                )}>
-                                    <div className={cn(
-                                        "p-2 rounded-lg",
-                                        isMe ? "bg-white/20" : "bg-white"
-                                    )}>
-                                        <FileIcon size={24} />
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <p className="font-medium text-sm truncate max-w-[150px]">
-                                            {message.text || "Attachment"}
-                                        </p>
-                                        <span className="text-xs opacity-70">Click to open</span>
-                                    </div>
-                                </a>
+                                (() => {
+                                    const isPdf = message.mediaUrl?.toLowerCase().endsWith('.pdf') || message.text?.toLowerCase().endsWith('.pdf');
+                                    return (
+                                        <div
+                                            onClick={(e) => {
+                                                if (isPdf) {
+                                                    e.stopPropagation();
+                                                    e.preventDefault();
+                                                    onMediaClick && onMediaClick(message.mediaUrl!, 'file');
+                                                }
+                                            }}
+                                            className={cn(
+                                                "flex items-center gap-3 p-3 rounded-xl mb-1 transition-colors cursor-pointer",
+                                                isMe ? "bg-white/20 hover:bg-white/30" : "bg-gray-100 hover:bg-gray-200"
+                                            )}
+                                        >
+                                            <div className={cn(
+                                                "p-2 rounded-lg flex items-center justify-center",
+                                                isMe ? "bg-white/20" : "bg-white",
+                                                isPdf ? "text-red-500" : ""
+                                            )}>
+                                                <FileIcon size={24} />
+                                                {isPdf && <span className="absolute text-[8px] font-bold mt-1 text-white bg-red-500 px-0.5 rounded">PDF</span>}
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <p className="font-medium text-sm truncate max-w-[150px]">
+                                                    {message.text || "Attachment"}
+                                                </p>
+                                                <div className="flex items-center gap-2 text-xs opacity-70">
+                                                    <span>{isPdf ? "Tap to preview" : "Click to download"}</span>
+                                                    {!isPdf && (
+                                                        <a href={message.mediaUrl} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className="hover:underline">
+                                                            Download
+                                                        </a>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })()
                             )}
                         </>
                     )}

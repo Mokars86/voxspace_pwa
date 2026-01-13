@@ -8,6 +8,8 @@ import { Post, SpaceEvent } from '../../types';
 import PostCard from '../../components/PostCard';
 import { SpaceChatRoomContent } from './SpaceChatRoom';
 import SpaceMembersModal from '../../components/SpaceMembersModal';
+import ImageViewer from '../../components/ImageViewer';
+
 
 const SpaceDetail: React.FC = () => {
     const { id } = useParams<{ id: string }>();
@@ -45,6 +47,8 @@ const SpaceDetail: React.FC = () => {
     // Event State
     const [showEventModal, setShowEventModal] = useState(false);
     const [newEvent, setNewEvent] = useState({ title: '', description: '', start_time: '', location: '' });
+    const [viewingImage, setViewingImage] = useState<string | null>(null);
+
 
     const handleCreateEvent = async () => {
         if (!newEvent.title || !newEvent.start_time || !user) return;
@@ -704,7 +708,12 @@ const SpaceDetail: React.FC = () => {
                                             <Pin size={10} /> Pinned
                                         </div>
                                     )}
-                                    <PostCard post={post} onPin={isOwner ? handlePin : undefined} onDelete={handleDeletePost} />
+                                    <PostCard
+                                        post={post}
+                                        onPin={isOwner ? handlePin : undefined}
+                                        onDelete={handleDeletePost}
+                                        onMediaClick={(url) => setViewingImage(url)}
+                                    />
                                 </div>
                             ))
                         ) : (
@@ -817,6 +826,12 @@ const SpaceDetail: React.FC = () => {
                     </div>
                 )
             }
+
+            <ImageViewer
+                isOpen={!!viewingImage}
+                onClose={() => setViewingImage(null)}
+                src={viewingImage || ''}
+            />
 
             {space && (
                 <SpaceMembersModal

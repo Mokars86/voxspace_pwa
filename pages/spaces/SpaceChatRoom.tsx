@@ -7,6 +7,8 @@ import { cn } from '../../lib/utils';
 import ChatInput from '../../components/chat/ChatInput';
 import MessageBubble, { ChatMessage } from '../../components/chat/MessageBubble';
 import ErrorBoundary from '../../components/ErrorBoundary';
+import PDFPreviewModal from '../../components/PDFPreviewModal';
+import ImageViewer from '../../components/ImageViewer';
 
 interface SpaceMessage extends ChatMessage {
     sender_id: string;
@@ -32,6 +34,8 @@ export const SpaceChatRoomContent: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [spaceName, setSpaceName] = useState('');
     const [isMember, setIsMember] = useState(false);
+    const [previewPdf, setPreviewPdf] = useState<string | null>(null);
+    const [previewMedia, setPreviewMedia] = useState<{ url: string, type: 'image' | 'video' } | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     // Reuse helper from ChatRoom if possible, or duplicate safely
@@ -321,7 +325,13 @@ export const SpaceChatRoomContent: React.FC = () => {
                                     )}
                                     <MessageBubble
                                         message={msg}
-                                        onMediaClick={() => { }}
+                                        onMediaClick={(url, type) => {
+                                            if (type === 'file' && url.toLowerCase().endsWith('.pdf')) {
+                                                setPreviewPdf(url);
+                                            } else {
+                                                setPreviewMedia({ url, type: type as 'image' | 'video' });
+                                            }
+                                        }}
                                     />
                                 </div>
                             </div>
@@ -330,6 +340,18 @@ export const SpaceChatRoomContent: React.FC = () => {
                 )}
                 <div ref={messagesEndRef} />
             </div>
+
+            <PDFPreviewModal
+                isOpen={!!previewPdf}
+                url={previewPdf || ''}
+                onClose={() => setPreviewPdf(null)}
+            />
+
+            <ImageViewer
+                isOpen={!!previewMedia && previewMedia.type === 'image'}
+                onClose={() => setPreviewMedia(null)}
+                src={previewMedia?.url || ''}
+            />
 
             {/* Input Area or Join Prompt */}
             {isMember ? (

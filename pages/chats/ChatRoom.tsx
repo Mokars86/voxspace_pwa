@@ -8,6 +8,7 @@ import MessageBubble, { ChatMessage } from '../../components/chat/MessageBubble'
 import ChatInput from '../../components/chat/ChatInput';
 import ForwardModal from '../../components/chat/ForwardModal';
 import ImageViewer from '../../components/ImageViewer';
+import PDFPreviewModal from '../../components/PDFPreviewModal';
 import { useCall } from '../../context/CallContext';
 import ErrorBoundary from '../../components/ErrorBoundary';
 import { cn } from '../../lib/utils';
@@ -31,6 +32,42 @@ const safeDate = (dateStr: string) => {
     } catch { return "Now"; }
 };
 
+const formatDateLabel = (dateStr?: string) => {
+    if (!dateStr) return 'Today';
+    const date = new Date(dateStr);
+    const today = new Date();
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    if (date.toDateString() === today.toDateString()) {
+        return 'Today';
+    }
+    if (date.toDateString() === yesterday.toDateString()) {
+        return 'Yesterday';
+    }
+    return date.toLocaleDateString([], { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+};
+
+const formatLastSeen = (dateStr?: string) => {
+    if (!dateStr) return '';
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return '';
+
+    const today = new Date();
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    if (date.toDateString() === today.toDateString()) {
+        return `last seen today at ${timeStr}`;
+    }
+    if (date.toDateString() === yesterday.toDateString()) {
+        return `last seen yesterday at ${timeStr}`;
+    }
+    return `last seen on ${date.toLocaleDateString([], { day: 'numeric', month: 'short' })} at ${timeStr}`;
+};
+
 const ChatRoom = () => {
     const { id } = useParams<{ id: string }>();
     const chatId = id;
@@ -46,6 +83,7 @@ const ChatRoom = () => {
     const [replyTo, setReplyTo] = useState<any>(null); // Message to reply to
     const [forwardingMessage, setForwardingMessage] = useState<Message | null>(null);
     const [previewMedia, setPreviewMedia] = useState<{ url: string, type: 'image' | 'video' | 'text', content?: string, allUrls?: string[] } | null>(null);
+    const [previewPdf, setPreviewPdf] = useState<string | null>(null);
     const [isBuzzing, setIsBuzzing] = useState(false);
     const [typingUsers, setTypingUsers] = useState<Set<string>>(new Set());
     const [showScrollBottom, setShowScrollBottom] = useState(false);
@@ -183,7 +221,9 @@ const ChatRoom = () => {
                     mediaUrl: m.media_url,
                     metadata: m.metadata,
                     isDeleted: m.is_deleted,
-                    isPinned: m.is_pinned // Cache supports pin
+
+                    isPinned: m.is_pinned, // Cache supports pin
+                    createdAt: m.created_at
                 }));
                 setMessages(formattedCached);
                 setLoading(false);
@@ -227,7 +267,8 @@ const ChatRoom = () => {
                     viewOnce: m.view_once,
                     isViewed: m.is_viewed,
                     isPinned: m.is_pinned,
-                    isEdited: m.is_edited
+                    isEdited: m.is_edited,
+                    createdAt: m.created_at
                 };
             });
             setMessages(formatted);
@@ -320,7 +361,8 @@ const ChatRoom = () => {
                 status: 'read',
                 mediaUrl: newMsgRaw.media_url,
                 metadata: newMsgRaw.metadata,
-                isPinned: newMsgRaw.is_pinned
+
+                createdAt: newMsgRaw.created_at
             };
 
             setMessages(prev => {
@@ -499,7 +541,9 @@ const ChatRoom = () => {
             expiresAt: expiresAt || undefined,
             isDeleted: false,
             isViewed: false,
-            viewOnce: metadata?.viewOnce || false
+
+            viewOnce: metadata?.viewOnce || false,
+            createdAt: new Date().toISOString()
         };
 
         setMessages(prev => [...prev, optimisticMsg]);
@@ -897,7 +941,12 @@ const ChatRoom = () => {
                                             isPartnerOnline ? (
                                                 <span className="text-xs text-green-500">Online</span>
                                             ) : (
-                                                <span className="text-xs font-bold text-[#ff1744]">Offline</span>
+                                                <span className="text-xs text-gray-500 dark:text-gray-400">
+                                                    {privacySettings?.last_seen_privacy !== 'nobody' && chatProfile?.last_seen_at
+                                                        ? formatLastSeen(chatProfile.last_seen_at)
+                                                        : "Offline"
+                                                    }
+                                                </span>
                                             )
                                         )
                                     )}
@@ -962,7 +1011,7 @@ const ChatRoom = () => {
                     {pinnedMessages.length > 0 && (
                         <div className="absolute top-[65px] left-0 right-0 z-40 bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm px-4 py-2 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between animate-in slide-in-from-top-2 shadow-sm cursor-pointer"
                             onClick={() => {
-                                const el = document.getElementById(`msg-\${pinnedMessages[pinnedMessages.length - 1].id}`);
+                                const el = document.getElementById(`msg-${pinnedMessages[pinnedMessages.length - 1].id}`);
                                 el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
                             }}
                         >
@@ -992,69 +1041,96 @@ const ChatRoom = () => {
                     >
                         {loading && <div className="flex justify-center py-4"><Loader2 className="animate-spin text-gray-400" /></div>}
 
-                        {messages.map((msg) => (
-                            <div id={`msg-\${msg.id}`} key={msg.id}>
-                                <MessageBubble
-                                    message={msg}
-                                    onReact={handleReaction}
-                                    onSwipeReply={handleSwipeReply}
-                                    onEdit={handleEditMessage}
-                                    onDelete={handleDeleteMessage}
-                                    onForward={setForwardingMessage}
-                                    onPin={handlePinMessage}
-                                    onMediaClick={(url, type) => setPreviewMedia({ url, type: type as 'image' | 'video' })}
-                                    onViewOnce={handleViewOnce}
-                                    onSaveToBag={handleSaveToBag}
-                                />
-                            </div>
-                        ))}
+                        {messages.map((msg, index) => {
+                            const prevMsg = messages[index - 1];
+                            const showDate = index === 0 ||
+                                (prevMsg?.createdAt && msg.createdAt &&
+                                    new Date(prevMsg.createdAt).toDateString() !== new Date(msg.createdAt).toDateString());
+
+                            return (
+                                <React.Fragment key={msg.id}>
+                                    {showDate && (
+                                        <div className="flex justify-center my-4 sticky top-[70px] z-10 pointer-events-none">
+                                            <div className="bg-gray-100 dark:bg-gray-800/80 text-gray-500 dark:text-gray-400 text-xs font-bold px-3 py-1 rounded-full shadow-sm border border-gray-200 dark:border-gray-700 backdrop-blur-md">
+                                                {formatDateLabel(msg.createdAt)}
+                                            </div>
+                                        </div>
+                                    )}
+                                    <div id={`msg-${msg.id}`}>
+                                        <MessageBubble
+                                            message={msg}
+                                            onReact={handleReaction}
+                                            onSwipeReply={handleSwipeReply}
+                                            onEdit={handleEditMessage}
+                                            onDelete={handleDeleteMessage}
+                                            onDelete={handleDeleteMessage}
+                                            onForward={setForwardingMessage}
+                                            onPin={handlePinMessage}
+                                            onMediaClick={(url, type) => {
+                                                if (type === 'file' && url.toLowerCase().endsWith('.pdf')) {
+                                                    setPreviewPdf(url);
+                                                } else {
+                                                    setPreviewMedia({ url, type: type as 'image' | 'video' });
+                                                }
+                                            }}
+                                            onViewOnce={handleViewOnce}
+                                            onSaveToBag={handleSaveToBag}
+                                        />
+                                    </div>
+                                </React.Fragment>
+                            );
+                        })}
 
 
 
                         <div className="h-4" /> {/* Spacer */}
                     </div>
 
-                    {showScrollBottom && (
-                        <button
-                            onClick={scrollToBottom}
-                            className="fixed bottom-32 right-4 bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-300 h-10 w-10 flex items-center justify-center rounded-full shadow-lg border border-gray-200 dark:border-gray-700 z-[100] animate-in fade-in zoom-in duration-200 hover:scale-110 transition-transform"
-                        >
-                            <ChevronDown size={24} />
-                        </button>
-                    )}
+                    {
+                        showScrollBottom && (
+                            <button
+                                onClick={scrollToBottom}
+                                className="fixed bottom-32 right-4 bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-300 h-10 w-10 flex items-center justify-center rounded-full shadow-lg border border-gray-200 dark:border-gray-700 z-[100] animate-in fade-in zoom-in duration-200 hover:scale-110 transition-transform"
+                            >
+                                <ChevronDown size={24} />
+                            </button>
+                        )
+                    }
 
                     {/* Input Area */}
-                    {!loading && participantStatus === 'accepted' ? (
-                        <div className="w-full bg-white dark:bg-gray-900">
-                            {recordingUsers.size > 0 && (
-                                <div className="px-4 py-1 animate-in slide-in-from-bottom-2 fade-in bg-white dark:bg-gray-900 border-t border-gray-50 dark:border-gray-800">
-                                    <span className="text-xs font-bold text-[#ff1744] animate-pulse flex items-center gap-2">
-                                        <div className="w-2 h-2 bg-[#ff1744] rounded-full animate-ping" />
-                                        {Array.from(recordingUsers).join(', ')} is recording voice...
-                                    </span>
-                                </div>
-                            )}
-                            <ChatInput
-                                onSend={handleSend}
-                                onTyping={handleTyping}
-                                onRecording={handleRecording}
-                                replyTo={replyTo}
-                                onCancelReply={() => setReplyTo(null)}
-                            />
-                        </div>
-                    ) : !loading && (
-                        <div className="p-6 bg-white border-t border-gray-200 text-center safe-bottom">
-                            <p className="text-gray-500">
+                    {
+                        !loading && participantStatus === 'accepted' ? (
+                            <div className="w-full bg-white dark:bg-gray-900">
+                                {recordingUsers.size > 0 && (
+                                    <div className="px-4 py-1 animate-in slide-in-from-bottom-2 fade-in bg-white dark:bg-gray-900 border-t border-gray-50 dark:border-gray-800">
+                                        <span className="text-xs font-bold text-[#ff1744] animate-pulse flex items-center gap-2">
+                                            <div className="w-2 h-2 bg-[#ff1744] rounded-full animate-ping" />
+                                            {Array.from(recordingUsers).join(', ')} is recording voice...
+                                        </span>
+                                    </div>
+                                )}
+                                <ChatInput
+                                    onSend={handleSend}
+                                    onTyping={handleTyping}
+                                    onRecording={handleRecording}
+                                    replyTo={replyTo}
+                                    onCancelReply={() => setReplyTo(null)}
+                                />
+                            </div>
+                        ) : !loading && (
+                            <div className="p-6 bg-white border-t border-gray-200 text-center safe-bottom">
                                 <p className="text-gray-500">
-                                    {participantStatus === 'blocked'
-                                        ? "You have blocked this user."
-                                        : participantStatus === 'blocked_by'
-                                            ? "You can no longer send messages to this user."
-                                            : "Request pending."}
+                                    <p className="text-gray-500">
+                                        {participantStatus === 'blocked'
+                                            ? "You have blocked this user."
+                                            : participantStatus === 'blocked_by'
+                                                ? "You can no longer send messages to this user."
+                                                : "Request pending."}
+                                    </p>
                                 </p>
-                            </p>
-                        </div>
-                    )}
+                            </div>
+                        )
+                    }
                 </div>
 
                 <ForwardModal
@@ -1107,6 +1183,14 @@ const ChatRoom = () => {
                         )
                     )
                 }
+
+
+                <PDFPreviewModal
+                    isOpen={!!previewPdf}
+                    url={previewPdf || ''}
+                    onClose={() => setPreviewPdf(null)}
+                />
+
                 {/* Timer Modal */}
                 {showTimerModal && (
                     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
