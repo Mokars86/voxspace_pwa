@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { MapPin, Link as LinkIcon, Calendar, Settings, Grid, Image, Heart, Loader2, QrCode, Archive, Lock } from 'lucide-react';
+import { Link as LinkIcon, Calendar, Settings, Grid, Image, Heart, Loader2, QrCode, Archive, Lock } from 'lucide-react';
 import { cn } from '../lib/utils';
 import PostCard from './PostCard';
 import { Post } from '../types';
@@ -22,6 +22,8 @@ interface ProfileData {
   followers_count: number;
   following_count: number;
   badge_type?: BadgeType;
+  referral_count?: number;
+  referral_code?: string;
 }
 
 const ProfileView: React.FC = () => {
@@ -29,6 +31,7 @@ const ProfileView: React.FC = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'posts' | 'media' | 'likes'>('posts');
   const [profile, setProfile] = useState<ProfileData | null>(null);
+  const [likedPosts, setLikedPosts] = useState<Post[]>([]);
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
@@ -47,12 +50,19 @@ const ProfileView: React.FC = () => {
           .eq('id', user.id)
           .single();
 
+
         // If no profile exists, profileData is null.
         if (profileError && profileError.code !== 'PGRST116') {
           throw profileError;
         }
 
-        setProfile(profileData);
+        // Fetch Referral Count
+        const { count: referralCount } = await supabase
+          .from('profiles')
+          .select('*', { count: 'exact', head: true })
+          .eq('referred_by', user.id);
+
+        setProfile({ ...profileData, referral_count: referralCount || 0 });
 
         // Fetch User Posts
         const { data: postsData, error: postsError } = await supabase
@@ -77,9 +87,61 @@ const ProfileView: React.FC = () => {
           likes: item.likes_count || 0,
           comments: item.comments_count || 0,
           reposts: item.reposts_count || 0,
-          media: item.media_url
+          media: item.media_url,
+          media_type: item.media_type
         }));
         setPosts(formattedPosts);
+
+        // Fetch Liked Posts
+        const { data: likedData, error: likedError } = await supabase
+          .from('post_likes')
+          .select('post_id') // Only need IDs
+          .eq('user_id', user.id);
+
+        if (likedError) console.error('Error fetching liked posts:', likedError);
+
+        if (!likedError && likedData) {
+          const likedPostIds = likedData.map(l => l.post_id);
+          console.log('DEBUG: Liked post IDs', likedPostIds);
+
+          if (likedPostIds.length > 0) {
+            console.log('DEBUG: Fetching details for liked posts...');
+            const { data: likedPostsDetails, error: lpError } = await supabase
+              .from('posts')
+              .select('*, profiles!inner(*)') // Inner join to ensure author exists
+              .in('id', likedPostIds)
+              .order('created_at', { ascending: false });
+
+            if (!lpError && likedPostsDetails) {
+              const formattedLikedPosts: Post[] = likedPostsDetails.map((item: any) => {
+                // SAFEGUARD for profiles
+                const authorProfile = Array.isArray(item.profiles) ? item.profiles[0] : item.profiles;
+
+                return {
+                  id: item.id,
+                  author: {
+                    id: authorProfile?.id,
+                    name: authorProfile?.full_name,
+                    username: authorProfile?.username,
+                    avatar: authorProfile?.avatar_url,
+                    isVerified: authorProfile?.is_verified,
+                    badge_type: authorProfile?.badge_type
+                  },
+                  content: item.content,
+                  timestamp: new Date(item.created_at).toLocaleDateString(),
+                  likes: item.likes_count || 0,
+                  comments: item.comments_count || 0,
+                  reposts: item.reposts_count,
+                  media: item.media_url,
+                  media_type: item.media_type,
+                  isLiked: true
+                };
+              });
+              setLikedPosts(formattedLikedPosts);
+            }
+          }
+        }
+
 
       } catch (error) {
         console.error("Error loading profile:", error);
@@ -96,7 +158,6 @@ const ProfileView: React.FC = () => {
   }
 
   // Default mock data if profile is technically "empty" / null from DB
-  // but usually triggered creation happens on signup
   const displayProfile = profile || {
     full_name: user?.user_metadata?.full_name || 'New User',
     username: 'newuser',
@@ -104,8 +165,12 @@ const ProfileView: React.FC = () => {
     bio: 'Ready to set up your profile!',
     website: '',
     is_verified: false,
-    created_at: new Date().toISOString()
+    created_at: new Date().toISOString(),
+    referral_count: 0,
+    referral_code: ''
   };
+
+  const mediaPosts = posts.filter(p => p.media);
 
   return (
     <div className="flex flex-col h-full bg-white dark:bg-gray-900 transition-colors">
@@ -156,6 +221,26 @@ const ProfileView: React.FC = () => {
             <Calendar size={16} />
             Joined {new Date(displayProfile.created_at).toLocaleDateString()}
           </div>
+          {displayProfile.website && (() => {
+            try {
+              const url = new URL(displayProfile.website.includes('://') ? displayProfile.website : `https://${displayProfile.website}`);
+              return (
+                <div className="flex items-center gap-1 mt-1">
+                  <LinkIcon size={16} />
+                  <a href={url.toString()} target="_blank" rel="noopener noreferrer" className="text-[#ff1744] hover:underline">
+                    {url.hostname}
+                  </a>
+                </div>
+              );
+            } catch {
+              return (
+                <div className="flex items-center gap-1 mt-1">
+                  <LinkIcon size={16} />
+                  <span className="text-gray-500">{displayProfile.website}</span>
+                </div>
+              );
+            }
+          })()}
         </div>
 
         <div className="flex flex-wrap gap-2 mb-4">
@@ -197,6 +282,38 @@ const ProfileView: React.FC = () => {
             <span className="text-gray-500 dark:text-gray-400">Followers</span>
           </div>
         </div>
+
+        {/* Referral Points Card */}
+        <div className="mb-6 p-4 bg-gradient-to-br from-gray-50 to-gray-100 dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="font-bold text-gray-900 dark:text-white flex items-center gap-2">
+              <span className="text-yellow-500">✨</span> VoxPoints
+            </h3>
+            <div className="text-2xl font-black text-[#ff1744]">
+              {displayProfile.referral_count ? displayProfile.referral_count * 50 : 0}
+            </div>
+          </div>
+          <p className="text-sm text-gray-500 mb-4">
+            You have referred {displayProfile.referral_count || 0} friends. Keep inviting to unlock badges!
+          </p>
+
+          <div className="flex items-center gap-2 bg-white dark:bg-gray-900 p-2 rounded-xl border border-dashed border-gray-300">
+            <code className="flex-1 font-mono font-bold text-center text-gray-700 dark:text-gray-300">
+              {displayProfile.referral_code || 'NO CODE'}
+            </code>
+            <button
+              onClick={() => {
+                if (displayProfile.referral_code) {
+                  navigator.clipboard.writeText(displayProfile.referral_code);
+                  alert("Code copied!");
+                }
+              }}
+              className="px-3 py-1.5 bg-gray-900 text-white text-xs font-bold rounded-lg hover:bg-black transition-colors"
+            >
+              Copy
+            </button>
+          </div>
+        </div>
       </div>
 
 
@@ -234,13 +351,35 @@ const ProfileView: React.FC = () => {
           </div>
         )}
         {activeTab === 'media' && (
-          <div className="p-8 text-center text-gray-400">
-            No media
+          <div className="p-1">
+            {mediaPosts.length > 0 ? (
+              <div className="grid grid-cols-3 gap-1">
+                {mediaPosts.map(post => (
+                  <div
+                    key={post.id}
+                    className="aspect-square bg-gray-100 dark:bg-gray-800 relative cursor-pointer group overflow-hidden"
+                    onClick={() => setPreviewImage(post.media!)}
+                  >
+                    {post.media_type === 'video' ? (
+                      <video src={post.media} className="w-full h-full object-cover" />
+                    ) : (
+                      <img src={post.media} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="p-8 text-center text-gray-400">No media</div>
+            )}
           </div>
         )}
         {activeTab === 'likes' && (
-          <div className="p-8 text-center text-gray-400">
-            No liked posts yet
+          <div>
+            {likedPosts.length > 0 ? (
+              likedPosts.map(post => <PostCard key={post.id} post={post} />)
+            ) : (
+              <div className="p-8 text-center text-gray-400">No liked posts yet</div>
+            )}
           </div>
         )}
       </div>
@@ -250,7 +389,7 @@ const ProfileView: React.FC = () => {
         onClose={() => setPreviewImage(null)}
         src={previewImage || ''}
       />
-    </div >
+    </div>
   );
 };
 

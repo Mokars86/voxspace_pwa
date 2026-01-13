@@ -20,6 +20,8 @@ const EditProfile: React.FC = () => {
 
     const fileInputRef = useRef<HTMLInputElement>(null);
 
+    const [hasUsername, setHasUsername] = useState(false);
+
     useEffect(() => {
         const loadProfile = async () => {
             if (!user) return;
@@ -37,6 +39,9 @@ const EditProfile: React.FC = () => {
                     website: data.website || '',
                     avatar_url: data.avatar_url || ''
                 });
+                if (data.username) {
+                    setHasUsername(true);
+                }
             }
         };
         loadProfile();
@@ -164,13 +169,17 @@ const EditProfile: React.FC = () => {
                     </div>
 
                     <div className="space-y-1">
-                        <label className="text-xs font-bold text-gray-500 uppercase">Username</label>
+                        <label className="text-xs font-bold text-gray-500 uppercase flex justify-between">
+                            Username
+                            {hasUsername && <span className="text-xs text-red-500 normal-case">Cannot be changed</span>}
+                        </label>
                         <input
                             type="text"
                             value={formData.username}
                             onChange={e => setFormData({ ...formData, username: e.target.value })}
-                            className="w-full p-4 bg-gray-50 rounded-xl font-bold text-gray-900 border-none focus:ring-1 focus:ring-[#ff1744]"
+                            className={`w-full p-4 bg-gray-50 rounded-xl font-bold text-gray-900 border-none focus:ring-1 focus:ring-[#ff1744] ${hasUsername ? 'opacity-60 cursor-not-allowed bg-gray-100 text-gray-500' : ''}`}
                             placeholder="@username"
+                            disabled={hasUsername}
                         />
                     </div>
 

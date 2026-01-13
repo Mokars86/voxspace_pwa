@@ -336,6 +336,7 @@ const StoryViewer: React.FC<StoryViewerProps> = ({ stories, initialIndex, onClos
                         src={currentStory.media_url}
                         className="w-full h-full object-contain"
                         playsInline
+                        poster={currentStory.metadata?.thumbnailUrl}
                         onLoadedMetadata={handleVideoLoad}
                         onEnded={handleNext}
                     />

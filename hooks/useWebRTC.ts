@@ -1,16 +1,22 @@
 
-
 import { useState, useRef, useEffect } from 'react';
 import { supabase } from '../services/supabase';
 
 const ICE_SERVERS = {
     iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:global.stun.twilio.com:3478' }
+        { urls: 'stun:global.stun.twilio.com:3478' },
+        { urls: 'stun:stun1.l.google.com:19302' },
+        { urls: 'stun:stun2.l.google.com:19302' },
+        { urls: 'stun:stun3.l.google.com:19302' },
+        { urls: 'stun:stun4.l.google.com:19302' }
     ]
 };
 
 
+
+// Add detailed logging
+const log = (msg: string, ...args: any[]) => console.log(`[useWebRTC] ${msg}`, ...args);
 
 export const useWebRTC = (user: any) => {
     const [callState, setCallState] = useState<'idle' | 'outgoing' | 'incoming' | 'connected' | 'reconnecting' | 'ending'>('idle');
@@ -40,22 +46,40 @@ export const useWebRTC = (user: any) => {
 
     // Track current call partner to know where to send signals
     const [otherUserId, setOtherUserId] = useState<string | null>(null);
+    // [CRITICAL FIX] Ref to avoid stale closures in callbacks
+    const otherUserIdRef = useRef<string | null>(null);
 
-    // Subscribe to MY signaling channel
+    // Helper to update both state and ref
+    const updateOtherUserId = (id: string | null) => {
+        setOtherUserId(id);
+        otherUserIdRef.current = id;
+    };
+
+    // Subscribe to MY signaling channel with robust error handling
     useEffect(() => {
         if (!user?.id) return;
 
+        console.log(`[useWebRTC] Subscribing to signaling channel: user_signaling:${user.id}`);
         const channel = supabase.channel(`user_signaling:${user.id}`);
 
         channel
             .on('broadcast', { event: 'signal' }, (payload) => {
+                console.log(`[useWebRTC] Received signal on my channel:`, payload.payload.type, "from", payload.payload.senderId);
                 handleSignal(payload.payload);
             })
-            .subscribe();
+            .subscribe((status) => {
+                console.log(`[useWebRTC] Subscription status for my channel: ${status}`);
+                if (status === 'SUBSCRIBED') {
+                    console.log(`[useWebRTC] Successfully subscribed to incoming signals.`);
+                } else if (status === 'CHANNEL_ERROR') {
+                    console.error(`[useWebRTC] Failed to subscribe to channel: ${status}`);
+                }
+            });
 
         return () => {
+            console.log(`[useWebRTC] Unsubscribing from my channel`);
             channel.unsubscribe();
-            endCall(); // Cleanup on unmount
+            endCall("unmount"); // Cleanup on unmount
         };
     }, [user?.id]);
 
@@ -65,19 +89,28 @@ export const useWebRTC = (user: any) => {
         const pc = new RTCPeerConnection(ICE_SERVERS);
 
         pc.onicecandidate = (event) => {
-            if (event.candidate && otherUserId) {
-                sendSignalToUser(otherUserId, { type: 'ice-candidate', candidate: event.candidate });
+            // [CRITICAL FIX] Use ref to get current otherUserId
+            if (event.candidate && otherUserIdRef.current) {
+                // console.log("Sending ICE candidate to", otherUserIdRef.current);
+                sendSignalToUser(otherUserIdRef.current, { type: 'ice-candidate', candidate: event.candidate });
+            } else if (event.candidate) {
+                console.warn("ICE candidate generated but no otherUserId", otherUserIdRef.current);
             }
         };
 
         pc.oniceconnectionstatechange = () => {
             console.log("ICE Connection State:", pc.iceConnectionState);
             if (pc.iceConnectionState === 'disconnected') {
-                setCallState('reconnecting');
+                console.warn("[useWebRTC] ICE Disconnected. Waiting for recovery...");
+                // Optional: Delay showing 'reconnecting' to avoid UI flicker if it recovers quickly
+                // setCallState('reconnecting'); 
             } else if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
+                console.log("[useWebRTC] ICE Connected");
                 setCallState('connected');
             } else if (pc.iceConnectionState === 'failed') {
-                endCall();
+                console.error("[useWebRTC] ICE Failed.");
+                setCallState('reconnecting'); // Only show reconnecting/failed on actual failure
+                // endCall("ice_failed"); // Don't auto-end, let user decide or retry
             }
         };
 
@@ -95,17 +128,23 @@ export const useWebRTC = (user: any) => {
                 setRemoteStream(event.streams[0]);
             } else {
                 // Fallback for browsers/implementations that don't send stream (e.g. mobile sometimes)
-                console.log("No stream in ontrack, creating new MediaStream");
-                const newStream = new MediaStream();
-                newStream.addTrack(event.track);
-                setRemoteStream(newStream);
+                // Accumulate tracks instead of checking for replacement
+                setRemoteStream(prev => {
+                    const newStream = new MediaStream();
+                    if (prev) {
+                        prev.getTracks().forEach(t => newStream.addTrack(t));
+                    }
+                    newStream.addTrack(event.track);
+                    return newStream;
+                });
             }
         };
 
         pc.onconnectionstatechange = () => {
             console.log("Connection State:", pc.connectionState);
             if (pc.connectionState === 'failed') {
-                endCall();
+                console.error("[useWebRTC] Connection Failed. Not auto-ending to allow potential recovery or manual hangup.");
+                // endCall("connection_failed"); // Too aggressive
             }
         };
 
@@ -134,66 +173,100 @@ export const useWebRTC = (user: any) => {
 
 
     const sendSignalToUser = async (targetUserId: string, payload: any) => {
-        if (!user) return;
+        if (!user) {
+            console.error("[useWebRTC] Cannot send signal: User not authenticated");
+            return;
+        }
+
+        console.log(`[useWebRTC] Preparing to send signal '${payload.type}' to user: ${targetUserId}`);
 
         let channel = signalingChannels.current.get(targetUserId);
 
         if (!channel) {
-            // console.log(`Creating new signaling channel to ${targetUserId}`);
+            console.log(`[useWebRTC] Creating new sending channel for target: user_signaling:${targetUserId}`);
             channel = supabase.channel(`user_signaling:${targetUserId}`);
 
-            // We must subscribe to SEND broadcast messages reliably
-            await new Promise<void>((resolve, reject) => {
-                channel.subscribe((status: string) => {
-                    if (status === 'SUBSCRIBED') {
-                        resolve();
-                    } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-                        reject(new Error(`Failed to subscribe to signaling channel: ${status}`));
-                    }
-                });
-            });
+            try {
+                await new Promise<void>((resolve, reject) => {
+                    const timeout = setTimeout(() => {
+                        reject(new Error("Subscription timeout"));
+                    }, 5000); // 5s timeout
 
-            signalingChannels.current.set(targetUserId, channel);
+                    channel.subscribe((status: string) => {
+                        console.log(`[useWebRTC] Sending channel status (${targetUserId}): ${status}`);
+                        if (status === 'SUBSCRIBED') {
+                            clearTimeout(timeout);
+                            resolve();
+                        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+                            clearTimeout(timeout);
+                            reject(new Error(`Failed to subscribe: ${status}`));
+                        }
+                    });
+                });
+                signalingChannels.current.set(targetUserId, channel);
+            } catch (err) {
+                console.error(`[useWebRTC] Error subscribing to sending channel for ${targetUserId}:`, err);
+                return; // Abort sending
+            }
+        } else {
+            console.log(`[useWebRTC] Reusing existing channel for ${targetUserId}`);
         }
 
-        // console.log(`Sending signal ${payload.type} to ${targetUserId}`);
-        await channel.send({
-            type: 'broadcast',
-            event: 'signal',
-            payload: {
-                ...payload,
-                senderId: user.id,
-                senderName: user.user_metadata?.full_name || 'User',
-                senderAvatar: user.user_metadata?.avatar_url
-            }
-        });
+        try {
+            const status = await channel.send({
+                type: 'broadcast',
+                event: 'signal',
+                payload: {
+                    ...payload,
+                    senderId: user.id,
+                    senderName: user.user_metadata?.full_name || 'User',
+                    senderAvatar: user.user_metadata?.avatar_url
+                }
+            });
+            console.log(`[useWebRTC] Signal '${payload.type}' sent result:`, status);
+        } catch (err) {
+            console.error(`[useWebRTC] FATAL: Failed to send signal '${payload.type}'`, err);
+        }
     };
 
 
 
     const startCall = async (targetId: string, targetName: string, targetAvatar: string, video: boolean = false) => {
-        setOtherUserId(targetId);
-        setCallerInfo({ id: targetId, name: targetName, avatar: targetAvatar }); // Temporarily reused for display
+        console.log(`[useWebRTC] STARTING CALL with ${targetName} (${targetId})`);
+        updateOtherUserId(targetId);
+        setCallerInfo({ id: targetId, name: targetName, avatar: targetAvatar });
 
         const stream = await getLocalStream(video);
-        if (!stream) return;
+        if (!stream) {
+            console.error("[useWebRTC] Failed to get local stream, aborting call.");
+            return;
+        }
 
         setIsVideoCall(video);
         setCallState('outgoing');
         const pc = createPeerConnection();
         stream.getTracks().forEach(track => pc.addTrack(track, stream));
 
-        const offer = await pc.createOffer();
-        await pc.setLocalDescription(offer);
+        console.log("[useWebRTC] Creating offer...");
+        try {
+            const offer = await pc.createOffer({
+                offerToReceiveAudio: true,
+                offerToReceiveVideo: video
+            });
+            await pc.setLocalDescription(offer);
+            console.log("[useWebRTC] Offer created and set locally. Sending...");
 
-        await sendSignalToUser(targetId, { type: 'offer', sdp: offer, isVideo: video });
-
-        // IMPORTANT: Ringing sound should be handled by UI/Context
+            await sendSignalToUser(targetId, { type: 'offer', sdp: offer, isVideo: video });
+            console.log("[useWebRTC] Offer signal process completed.");
+        } catch (err) {
+            console.error("[useWebRTC] Error during startCall offer generation/sending:", err);
+            setCallState('idle'); // Reset on failure
+        }
     };
 
     const answerCall = async () => {
         if (!callerInfo?.id) return;
-        setOtherUserId(callerInfo.id);
+        updateOtherUserId(callerInfo.id);
 
         const stream = await getLocalStream(isVideoCall); // Respond with same video capability?
         if (!stream) return;
@@ -201,9 +274,13 @@ export const useWebRTC = (user: any) => {
         const pc = createPeerConnection();
         // Assuming stream tracks are ready, but we should add them?
         // Wait, current logic adds them BEFORE creating answer usually.
+        // Wait, current logic adds them BEFORE creating answer usually.
         stream.getTracks().forEach(track => pc.addTrack(track, stream));
 
-        const answer = await pc.createAnswer();
+        const answer = await pc.createAnswer({
+            offerToReceiveAudio: true,
+            offerToReceiveVideo: isVideoCall
+        });
         await pc.setLocalDescription(answer);
 
         await sendSignalToUser(callerInfo.id, { type: 'answer', sdp: answer });
@@ -244,9 +321,11 @@ export const useWebRTC = (user: any) => {
             // Check if already in call?
             if (callStateRef.current !== 'idle' && callStateRef.current !== 'incoming') {
                 // Busy? Send 'busy' signal?
-                console.log("Busy: received offer while in state", callStateRef.current);
+                console.warn(`[useWebRTC] Busy: received offer while in state ${callStateRef.current}`);
                 return;
             }
+
+            console.log(`[useWebRTC] Accepting offer from ${payload.senderName} (${payload.senderId})`);
 
             setCallState('incoming');
             setIsVideoCall(payload.isVideo || false);
@@ -255,8 +334,14 @@ export const useWebRTC = (user: any) => {
                 name: payload.senderName,
                 avatar: payload.senderAvatar || ''
             });
-            // CRITICAL FIX: Set otherUserId so we know where to send our ICE candidates!
-            setOtherUserId(payload.senderId);
+
+            // CRITICAL FIX: Set otherUserId immediately so we know where to send our signals (like ICE candidates)!
+            if (payload.senderId) {
+                updateOtherUserId(payload.senderId);
+                console.log(`[useWebRTC] Set otherUserId to ${payload.senderId} for incoming call.`);
+            } else {
+                console.error("[useWebRTC] Received offer without senderId!", payload);
+            }
 
             // Create PC to be ready, but don't answer yet
             const pc = createPeerConnection();
@@ -264,21 +349,32 @@ export const useWebRTC = (user: any) => {
             try {
                 await pc.setRemoteDescription(new RTCSessionDescription(payload.sdp));
                 isRemoteDescriptionSet.current = true;
+                console.log(`[useWebRTC] Remote description set for offer. Processing ICE queue...`);
                 await processIceQueue(); // Process any early candidates
             } catch (err) {
-                console.error("Error setting remote description", err);
+                console.error("[useWebRTC] Error setting remote description for offer", err);
             }
 
         } else if (payload.type === 'answer') {
             // Check if we are in 'outgoing' state using the Ref to avoid stale closure
             if (callStateRef.current === 'outgoing' && peerConnection.current) {
+                if (peerConnection.current.signalingState === 'stable') {
+                    console.warn("[useWebRTC] Received answer but PC is already stable. Assuming call established/duplicate signal.");
+                    if (!isRemoteDescriptionSet.current) {
+                        isRemoteDescriptionSet.current = true; // Just in case
+                        setCallState('connected');
+                    }
+                    return;
+                }
+
                 try {
                     await peerConnection.current.setRemoteDescription(new RTCSessionDescription(payload.sdp));
                     isRemoteDescriptionSet.current = true;
+                    console.log("[useWebRTC] Remote description set for answer. Processing ICE queue...");
                     await processIceQueue();
                     setCallState('connected');
                 } catch (err) {
-                    console.error("Error setting remote answer", err);
+                    console.error("[useWebRTC] Error setting remote answer", err);
                 }
             } else {
                 console.warn("Received answer but state is not outgoing or PC missing", callStateRef.current);
@@ -298,31 +394,38 @@ export const useWebRTC = (user: any) => {
             }
 
         } else if (payload.type === 'hangup') {
-            endCall();
+            endCall("remote_hangup");
         }
     };
 
-    const endCall = async () => {
-        if (otherUserId && callState !== 'idle') {
-            sendSignalToUser(otherUserId, { type: 'hangup' }).catch(() => { });
+    const endCall = async (reason: string = "unknown") => {
+        console.log(`[useWebRTC] Ending call. Reason: ${reason}`);
+        if (otherUserIdRef.current && callState !== 'idle') {
+            console.log(`[useWebRTC] Sending hangup signal to ${otherUserIdRef.current}`);
+            sendSignalToUser(otherUserIdRef.current, { type: 'hangup' }).catch((e) => console.error("Failed to send hangup", e));
         }
 
         startTimeRef.current = null;
         setCallId(null);
         setRemoteStream(null);
-        setOtherUserId(null);
+        // Do not nullify otherUserIdRef immediately if we want to allow reconnects? No, cleaner to reset.
+        updateOtherUserId(null);
 
         // Reset ICE buffering state
         iceCandidatesQueue.current = [];
         isRemoteDescriptionSet.current = false;
 
         if (localStreamRef.current) {
-            localStreamRef.current.getTracks().forEach(track => track.stop());
+            localStreamRef.current.getTracks().forEach(track => {
+                track.stop();
+                console.log(`[useWebRTC] Stopped local track: ${track.kind}`);
+            });
             localStreamRef.current = null;
         }
         setLocalStream(null);
 
         if (peerConnection.current) {
+            console.log("[useWebRTC] Closing PeerConnection");
             peerConnection.current.close();
             peerConnection.current = null;
         }
@@ -335,17 +438,6 @@ export const useWebRTC = (user: any) => {
 
     const toggleMute = () => {
         if (localStreamRef.current) {
-            localStreamRef.current.getAudioTracks().forEach(track => {
-                track.enabled = isMuted; // Toggle logic inverse
-                // Wait. if isMuted is currently false, we want to SET MUTE (track.enabled = false).
-                // if isMuted is currently true, we want to UNMUTE (track.enabled = true).
-                track.enabled = isMuted; // Valid because state update happens after? No.
-                // CURRENT state: isMuted = false. We want MUTE. Track should be false.
-                // So track.enabled = !currentState.
-                // No, 'enabled' true means active (Unmuted).
-                // So if we are currently Unmuted (isMuted=false), we want to Mute. track.enabled = false.
-            });
-            // Fix logic:
             const newMuted = !isMuted;
             localStreamRef.current.getAudioTracks().forEach(track => track.enabled = !newMuted);
             setIsMuted(newMuted);

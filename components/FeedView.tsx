@@ -244,12 +244,63 @@ const FeedView: React.FC = () => {
 
     const channel = supabase
       .channel('public:posts')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'posts' },
-        (payload) => {
-          // If we just created a post (tempId exists), we might want to ignore or handle
-          // simpler to just refetch or let handleCreatePost manage it. 
-          // Refetch is safest for consistency.
-          fetchPosts();
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'posts', filter: 'space_id=is.null' },
+        async (payload) => {
+          // Fetch only the new post details
+          const { data, error } = await supabase
+            .from('posts')
+            .select(`
+                    id,
+                    content,
+                    media_url,
+                    media_type,
+                    location,
+                    created_at,
+                    likes_count,
+                    comments_count,
+                    reposts_count,
+                    is_pinned,
+                    user_id,
+                    profiles:user_id (
+                        full_name,
+                        username,
+                        avatar_url,
+                        is_verified,
+                        badge_type
+                    ),
+                    post_likes(user_id)
+                `)
+            .eq('id', payload.new.id)
+            .single();
+
+          if (!error && data) {
+            const newPost: Post = {
+              id: data.id,
+              author: {
+                id: data.user_id,
+                name: data.profiles?.full_name || 'Unknown',
+                username: data.profiles?.username || 'user',
+                avatar: data.profiles?.avatar_url || '',
+                isVerified: data.profiles?.is_verified || false,
+                badge_type: data.profiles?.badge_type
+              },
+              content: data.content,
+              timestamp: new Date(data.created_at).toLocaleDateString(),
+              likes: data.likes_count || 0,
+              comments: data.comments_count || 0,
+              reposts: data.reposts_count || 0,
+              media: data.media_url,
+              media_type: data.media_type,
+              location: data.location,
+              isLiked: user ? data.post_likes?.some((l: any) => l.user_id === user.id) : false,
+              is_pinned: data.is_pinned
+            };
+
+            setPosts(prev => {
+              if (prev.some(p => p.id === newPost.id)) return prev;
+              return [newPost, ...prev];
+            });
+          }
         }
       )
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'posts' },

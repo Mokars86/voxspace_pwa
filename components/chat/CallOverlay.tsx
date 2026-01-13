@@ -43,8 +43,24 @@ const CallOverlay: React.FC<CallOverlayProps> = ({
     const [isPlaying, setIsPlaying] = useState(false);
     const audioRef = useRef<HTMLAudioElement>(null);
 
+    // Timer Logic
+    useEffect(() => {
+        let interval: NodeJS.Timeout;
+        if (state === 'connected') {
+            interval = setInterval(() => {
+                setDuration(prev => prev + 1);
+            }, 1000);
+        } else if (state === 'idle' || state === 'incoming' || state === 'outgoing') {
+            // Only reset if effectively not in a call
+            setDuration(0);
+        }
+        // If reconnecting/ending, we just pause (clear interval)
+        return () => clearInterval(interval);
+    }, [state]);
+
     // Helper to attempt playback
     const attemptPlay = async (element: HTMLMediaElement, updateState: boolean = true) => {
+        if (!element) return;
         try {
             await element.play();
             if (updateState) setIsPlaying(true);
@@ -58,27 +74,48 @@ const CallOverlay: React.FC<CallOverlayProps> = ({
         if (localVideoRef.current && localStream) {
             localVideoRef.current.srcObject = localStream;
             localVideoRef.current.onloadedmetadata = () => {
-                localVideoRef.current!.muted = true; // Always mute local video to prevent feedback
-                attemptPlay(localVideoRef.current!, false); // Don't count local video as "playing" for the blockage check
+                localVideoRef.current!.muted = true; // Always mute local video
+                attemptPlay(localVideoRef.current!, false);
             };
         }
     }, [localStream, isOpen]);
 
+    const currentAudioTrackIdRef = useRef<string | null>(null);
+
     useEffect(() => {
-        if (remoteVideoRef.current && remoteStream) {
-            remoteVideoRef.current.srcObject = remoteStream;
-            remoteVideoRef.current.onloadedmetadata = () => {
-                attemptPlay(remoteVideoRef.current!);
-            };
+        // Audio Handling: Stable assignment
+        if (audioRef.current && remoteStream) {
+            const audioTracks = remoteStream.getAudioTracks();
+            if (audioTracks.length > 0) {
+                const track = audioTracks[0];
+                if (currentAudioTrackIdRef.current !== track.id) {
+                    currentAudioTrackIdRef.current = track.id;
+                    const audioStream = new MediaStream([track]);
+                    audioRef.current.srcObject = audioStream;
+                    audioRef.current.onloadedmetadata = () => {
+                        audioRef.current!.muted = false;
+                        audioRef.current!.volume = 1.0;
+                        attemptPlay(audioRef.current!);
+                    };
+                }
+            }
         }
 
-        if (audioRef.current && remoteStream) {
-            audioRef.current.srcObject = remoteStream;
-            audioRef.current.onloadedmetadata = () => {
-                attemptPlay(audioRef.current!);
-            };
+        // Video Handling
+        if (remoteVideoRef.current && remoteStream && isVideoCall) {
+            const videoTracks = remoteStream.getVideoTracks();
+            if (videoTracks.length > 0) {
+                const videoStream = new MediaStream(videoTracks);
+                remoteVideoRef.current.srcObject = videoStream;
+                remoteVideoRef.current.onloadedmetadata = () => {
+                    remoteVideoRef.current!.muted = true;
+                    attemptPlay(remoteVideoRef.current!);
+                };
+            }
+        } else if (remoteVideoRef.current && !isVideoCall) {
+            remoteVideoRef.current.srcObject = null;
         }
-    }, [remoteStream, isOpen]);
+    }, [remoteStream, isOpen, isVideoCall]);
 
     const formatDuration = (sec: number) => {
         const m = Math.floor(sec / 60);
@@ -86,10 +123,16 @@ const CallOverlay: React.FC<CallOverlayProps> = ({
         return `${m}:${s < 10 ? '0' : ''}${s}`;
     };
 
+    useEffect(() => {
+        if (isOpen) {
+            console.log(`[CallOverlay] Overlay opened. State: ${state}, Caller: ${callerName}`);
+        }
+    }, [isOpen, state, callerName]);
+
     if (!isOpen || state === 'idle') return null;
 
     return (
-        <div className={cn("fixed inset-0 z-[100] backdrop-blur-sm flex flex-col items-center justify-center text-white animate-in fade-in duration-300 overflow-hidden", isVideoCall ? "bg-black/50" : "bg-gray-900/95")}>
+        <div className={cn("fixed inset-0 z-[99999] backdrop-blur-sm flex flex-col items-center justify-center text-white animate-in fade-in duration-300 overflow-hidden", isVideoCall ? "bg-black/50" : "bg-gray-900/95")}>
 
             {/* Background Video (Remote) */}
             {isVideoCall && (
@@ -165,8 +208,10 @@ const CallOverlay: React.FC<CallOverlayProps> = ({
 
             {/* Controls */}
             <div className="flex items-center gap-8 absolute bottom-12 z-20">
+                {/* ... existing controls ... */}
                 {state === 'incoming' ? (
                     <>
+                        {/* ... incoming controls ... */}
                         <button
                             onClick={onReject}
                             className="flex flex-col items-center gap-2 group"
@@ -223,6 +268,8 @@ const CallOverlay: React.FC<CallOverlayProps> = ({
                     </>
                 )}
             </div>
+
+
         </div>
     );
 };

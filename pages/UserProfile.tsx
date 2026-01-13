@@ -51,7 +51,14 @@ const UserProfile: React.FC = () => {
                     .single();
 
                 if (error) throw error;
-                setProfile(data);
+
+                // 1.5 Fetch Referral Count
+                const { count: referralCount } = await supabase
+                    .from('profiles')
+                    .select('*', { count: 'exact', head: true })
+                    .eq('referred_by', id);
+
+                setProfile({ ...data, referral_count: referralCount || 0 });
 
                 // 2. Check Follow Status (if logged in and not own profile)
                 if (currentUser && currentUser.id !== id) {
@@ -339,6 +346,40 @@ const UserProfile: React.FC = () => {
                             }
                         })()}
                     </div>
+
+                    {/* Referral Points Card (Only Visible to Owner) */}
+                    {isOwnProfile && (
+                        <div className="mb-6 p-4 bg-gradient-to-br from-gray-50 to-gray-100 dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700">
+                            <div className="flex items-center justify-between mb-2">
+                                <h3 className="font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                                    <span className="text-yellow-500">✨</span> VoxPoints
+                                </h3>
+                                <div className="text-2xl font-black text-[#ff1744]">
+                                    {(profile as any).referral_count ? (profile as any).referral_count * 50 : 0}
+                                </div>
+                            </div>
+                            <p className="text-sm text-gray-500 mb-4">
+                                You have referred {(profile as any).referral_count || 0} friends. Keep inviting to unlock badges!
+                            </p>
+
+                            <div className="flex items-center gap-2 bg-white dark:bg-gray-900 p-2 rounded-xl border border-dashed border-gray-300">
+                                <code className="flex-1 font-mono font-bold text-center text-gray-700 dark:text-gray-300">
+                                    {(profile as any).referral_code || 'NO CODE'}
+                                </code>
+                                <button
+                                    onClick={() => {
+                                        if ((profile as any).referral_code) {
+                                            navigator.clipboard.writeText((profile as any).referral_code);
+                                            alert("Code copied!");
+                                        }
+                                    }}
+                                    className="px-3 py-1.5 bg-gray-900 text-white text-xs font-bold rounded-lg hover:bg-black transition-colors"
+                                >
+                                    Copy
+                                </button>
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
 

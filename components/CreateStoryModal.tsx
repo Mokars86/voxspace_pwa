@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { X, Image, Type, Send, Loader2, Video, Mic, ListChecks, Trash2, StopCircle, Clock } from 'lucide-react';
 import { supabase } from '../services/supabase';
+import { generateVideoThumbnail } from '../lib/videoUtils';
 import { useAuth } from '../context/AuthContext';
 
 interface CreateStoryModalProps {
@@ -82,10 +83,33 @@ const CreateStoryModal: React.FC<CreateStoryModalProps> = ({ onClose, onSuccess 
 
             const { data } = supabase.storage.from('stories').getPublicUrl(filePath);
 
+            let thumbnailUrl = '';
+            if (previewFile.type === 'video') {
+                try {
+                    const thumbBlob = await generateVideoThumbnail(file);
+                    if (thumbBlob) {
+                        const thumbName = `${user.id}/${Date.now()}_thumb.jpg`;
+                        const { error: thumbErr } = await supabase.storage
+                            .from('stories')
+                            .upload(thumbName, thumbBlob);
+
+                        if (!thumbErr) {
+                            const { data: thumbData } = supabase.storage
+                                .from('stories')
+                                .getPublicUrl(thumbName);
+                            thumbnailUrl = thumbData.publicUrl;
+                        }
+                    }
+                } catch (e) {
+                    console.error("Story thumbnail failed", e);
+                }
+            }
+
             await createStory({
                 type: previewFile.type,
                 media_url: data.publicUrl,
-                content: caption // Save caption in content column
+                content: caption,
+                metadata: thumbnailUrl ? { thumbnailUrl } : undefined
             });
 
         } catch (error) {

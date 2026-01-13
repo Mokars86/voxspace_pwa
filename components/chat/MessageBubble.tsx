@@ -149,7 +149,8 @@ const AudioPlayer = ({ url, isMe, duration: initialDuration, type }: { url: stri
                 onTimeUpdate={handleTimeUpdate}
                 onLoadedMetadata={handleTimeUpdate}
                 onEnded={handleEnded}
-                onError={(e) => console.error("Audio Load Error", e)}
+                // onError={(e) => console.error("Audio Load Error", e)} // Suppress noise
+                onError={() => { }} // Silent fail
                 className="hidden"
             />
         </div>
@@ -163,28 +164,49 @@ const MessageBubble: React.FC<MessageProps> = ({ message, onSwipeReply, onReact,
     const [isEditing, setIsEditing] = React.useState(false);
     const [editText, setEditText] = React.useState(message.text);
 
-    // Swipe Logic
+    // Swipe & Long Press Logic
     const [swipeOffset, setSwipeOffset] = React.useState(0);
     const touchStartRef = React.useRef<number | null>(null);
+    const longPressTimerRef = React.useRef<NodeJS.Timeout | null>(null);
     const SWIPE_THRESHOLD = 50;
 
     const handleTouchStart = (e: React.TouchEvent) => {
-        if (showMenu || isEditing) return; // Disable swipe if menu/edit open
+        if (showMenu || isEditing) return; // Disable if menu/edit open
         touchStartRef.current = e.targetTouches[0].clientX;
+
+        // Start Long Press Timer
+        longPressTimerRef.current = setTimeout(() => {
+            setShowMenu(true);
+            if (navigator.vibrate) navigator.vibrate(50);
+        }, 500);
     };
 
     const handleTouchMove = (e: React.TouchEvent) => {
         if (touchStartRef.current === null) return;
         const currentX = e.targetTouches[0].clientX;
-        const diff = currentX - touchStartRef.current;
+        const diffX = currentX - touchStartRef.current; // directional for swipe
+
+        // Cancel Long Press if moved
+        if (Math.abs(diffX) > 10) {
+            if (longPressTimerRef.current) {
+                clearTimeout(longPressTimerRef.current);
+                longPressTimerRef.current = null;
+            }
+        }
 
         // Only allow swiping right (positive diff) and clamp it
-        if (diff > 0 && diff < 100) {
-            setSwipeOffset(diff);
+        if (diffX > 0 && diffX < 100) {
+            setSwipeOffset(diffX);
         }
     };
 
     const handleTouchEnd = () => {
+        // Clear Long Press Timer
+        if (longPressTimerRef.current) {
+            clearTimeout(longPressTimerRef.current);
+            longPressTimerRef.current = null;
+        }
+
         if (swipeOffset > SWIPE_THRESHOLD) {
             if (onSwipeReply) onSwipeReply(message);
             // Haptic feedback if available
@@ -252,7 +274,7 @@ const MessageBubble: React.FC<MessageProps> = ({ message, onSwipeReply, onReact,
                             {message.isPinned ? "Unpin Message" : "Pin Message"}
                         </button>
                         {isMe && message.type === 'text' && (
-                            <button onClick={() => setIsEditing(true)} className="w-full text-left px-4 py-2 hover:bg-gray-50 text-sm font-medium">Edit</button>
+                            <button onClick={() => { setIsEditing(true); setShowMenu(false); }} className="w-full text-left px-4 py-2 hover:bg-gray-50 text-sm font-medium">Edit</button>
                         )}
                         <button onClick={() => { onForward && onForward(message); setShowMenu(false); }} className="w-full text-left px-4 py-2 hover:bg-gray-50 text-sm font-medium">Forward</button>
                         <button onClick={() => { onSaveToBag && onSaveToBag(message); setShowMenu(false); }} className="w-full text-left px-4 py-2 hover:bg-gray-50 text-sm font-medium flex items-center gap-2">
@@ -389,7 +411,11 @@ const MessageBubble: React.FC<MessageProps> = ({ message, onSwipeReply, onReact,
                                             <Play className="text-white fill-white ml-1" size={24} />
                                         </div>
                                     </div>
-                                    <video src={message.mediaUrl} className="w-full max-h-[300px] rounded-lg object-cover bg-black" />
+                                    {message.metadata?.thumbnailUrl ? (
+                                        <img src={message.metadata.thumbnailUrl} className="w-full max-h-[300px] rounded-lg object-cover bg-black" alt="Video thumbnail" />
+                                    ) : (
+                                        <video src={message.mediaUrl} className="w-full max-h-[300px] rounded-lg object-cover bg-black" preload="metadata" />
+                                    )}
                                     <div className="absolute bottom-2 right-2 px-2 py-0.5 bg-black/60 rounded text-[10px] text-white font-medium flex items-center gap-1">
                                         <Video size={10} /> Video
                                     </div>

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Mail, Lock, AlertCircle, Loader2, Eye, EyeOff, CheckCheck } from 'lucide-react';
+import { ArrowLeft, Mail, Lock, AlertCircle, Loader2, Eye, EyeOff, CheckCheck, User, Camera, AtSign } from 'lucide-react';
 import { supabase } from '../../services/supabase';
 import { useAuth } from '../../context/AuthContext';
 
@@ -15,6 +15,12 @@ const Login: React.FC = () => {
     const [error, setError] = useState<string | null>(null);
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
+    const [fullName, setFullName] = useState('');
+    const [username, setUsername] = useState('');
+    const [referralCode, setReferralCode] = useState('');
+    const [avatarFile, setAvatarFile] = useState<File | null>(null);
+    const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+
     // Forgot Password State
     const [showForgotPassword, setShowForgotPassword] = useState(false);
     const [resetEmail, setResetEmail] = useState('');
@@ -25,6 +31,14 @@ const Login: React.FC = () => {
             navigate('/');
         }
     }, [user, navigate]);
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files[0]) {
+            const file = e.target.files[0];
+            setAvatarFile(file);
+            setAvatarPreview(URL.createObjectURL(file));
+        }
+    };
 
     const handleResetPassword = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -54,12 +68,80 @@ const Login: React.FC = () => {
 
         try {
             if (isSignUp) {
-                const { error } = await supabase.auth.signUp({
+                // 1. Upload Avatar if selected
+                let avatarUrl = '';
+                if (avatarFile) {
+                    const fileExt = avatarFile.name.split('.').pop();
+                    const fileName = `${Math.random()}.${fileExt}`;
+                    const filePath = `${fileName}`;
+
+                    const { error: uploadError } = await supabase.storage
+                        .from('avatars')
+                        .upload(filePath, avatarFile);
+
+                    if (uploadError) throw uploadError;
+
+                    const { data: { publicUrl } } = supabase.storage
+                        .from('avatars')
+                        .getPublicUrl(filePath);
+
+                    avatarUrl = publicUrl;
+                }
+
+                // 2. Sign Up
+                const { data, error } = await supabase.auth.signUp({
                     email,
                     password,
+                    options: {
+                        data: {
+                            full_name: fullName,
+                            username: username,
+                            avatar_url: avatarUrl,
+                        },
+                    },
                 });
                 if (error) throw error;
-                // Auto-redirect happens via AuthContext listener
+
+                // 3. Update Profile (Manual ensure)
+                if (data.user) {
+                    let referrerId = null;
+                    if (referralCode) {
+                        const { data: referrerData } = await supabase
+                            .from('profiles')
+                            .select('id')
+                            .eq('referral_code', referralCode)
+                            .single();
+                        if (referrerData) {
+                            referrerId = referrerData.id;
+                        }
+                    }
+
+                    // Generate unique referral code for this new user
+                    // Simple strategy: First 4 chars of username + 4 random chars
+                    const cleanUsername = username.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().substring(0, 5);
+                    const randomSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
+                    const newReferralCode = `${cleanUsername}${randomSuffix}`;
+
+                    const updates = {
+                        id: data.user.id,
+                        username,
+                        full_name: fullName,
+                        avatar_url: avatarUrl,
+                        updated_at: new Date(),
+                        referral_code: newReferralCode,
+                        referred_by: referrerId
+                    };
+
+                    const { error: profileError } = await supabase
+                        .from('profiles')
+                        .upsert(updates);
+
+                    if (profileError) {
+                        console.error('Profile update error:', profileError);
+                        // Don't throw here to avoid blocking auth success, but maybe warn?
+                    }
+                }
+
             } else {
                 const { error } = await supabase.auth.signInWithPassword({
                     email,
@@ -102,6 +184,79 @@ const Login: React.FC = () => {
                 </div>
 
                 <form onSubmit={handleAuth} className="space-y-4">
+                    {isSignUp && (
+                        <>
+                            {/* Avatar Picker */}
+                            <div className="flex justify-center mb-6">
+                                <div className="relative">
+                                    <div className="w-24 h-24 rounded-full bg-gray-100 flex items-center justify-center overflow-hidden border-4 border-white shadow-lg">
+                                        {avatarPreview ? (
+                                            <img src={avatarPreview} alt="Profile Preview" className="w-full h-full object-cover" />
+                                        ) : (
+                                            <User size={40} className="text-gray-400" />
+                                        )}
+                                    </div>
+                                    <label className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-[#ff1744] hover:bg-[#d50000] flex items-center justify-center cursor-pointer transition-colors text-white shadow-md">
+                                        <Camera size={14} />
+                                        <input
+                                            type="file"
+                                            className="hidden"
+                                            accept="image/*"
+                                            onChange={handleFileChange}
+                                        />
+                                    </label>
+                                </div>
+                            </div>
+
+                            {/* Full Name */}
+                            <div className="space-y-2">
+                                <label className="text-sm font-semibold text-gray-700 ml-1">Full Name</label>
+                                <div className="relative">
+                                    <User className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+                                    <input
+                                        type="text"
+                                        value={fullName}
+                                        onChange={(e) => setFullName(e.target.value)}
+                                        placeholder="John Doe"
+                                        className="w-full pl-12 pr-4 py-4 bg-gray-50 border-2 border-transparent focus:border-[#ff1744]/20 focus:bg-white rounded-2xl outline-none transition-all font-medium text-gray-900"
+                                        required={isSignUp}
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Username */}
+                            <div className="space-y-2">
+                                <label className="text-sm font-semibold text-gray-700 ml-1">Username</label>
+                                <div className="relative">
+                                    <AtSign className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+                                    <input
+                                        type="text"
+                                        value={username}
+                                        onChange={(e) => setUsername(e.target.value)}
+                                        placeholder="johndoe"
+                                        className="w-full pl-12 pr-4 py-4 bg-gray-50 border-2 border-transparent focus:border-[#ff1744]/20 focus:bg-white rounded-2xl outline-none transition-all font-medium text-gray-900"
+                                        required={isSignUp}
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Referral Code */}
+                            <div className="space-y-2">
+                                <label className="text-sm font-semibold text-gray-700 ml-1">Referral Code (Optional)</label>
+                                <div className="relative">
+                                    <User className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+                                    <input
+                                        type="text"
+                                        value={referralCode}
+                                        onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
+                                        placeholder="REFERRAL123"
+                                        className="w-full pl-12 pr-4 py-4 bg-gray-50 border-2 border-transparent focus:border-[#ff1744]/20 focus:bg-white rounded-2xl outline-none transition-all font-medium text-gray-900"
+                                    />
+                                </div>
+                            </div>
+                        </>
+                    )}
+
                     <div className="space-y-2">
                         <label className="text-sm font-semibold text-gray-700 ml-1">Email Address</label>
                         <div className="relative">

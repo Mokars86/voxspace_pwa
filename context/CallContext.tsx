@@ -22,13 +22,18 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     useEffect(() => {
         if (webrtc.callState === 'incoming' || webrtc.callState === 'outgoing') {
+            console.log(`[CallContext] State is ${webrtc.callState}, attempting to play ringtone...`);
             if (!ringtoneRef.current) {
                 ringtoneRef.current = new Audio('/sounds/ringtone.mp3');
                 ringtoneRef.current.loop = true;
+                ringtoneRef.current.volume = 0.5; // Ensure not too loud
             }
-            ringtoneRef.current.play().catch(e => console.log('Autoplay blocked:', e));
+            ringtoneRef.current.play()
+                .then(() => console.log('[CallContext] Ringtone playing successfully'))
+                .catch(e => console.error('[CallContext] Ringtone autoplay blocked or failed:', e));
         } else {
             if (ringtoneRef.current) {
+                console.log('[CallContext] Stopping ringtone');
                 ringtoneRef.current.pause();
                 ringtoneRef.current.currentTime = 0;
             }

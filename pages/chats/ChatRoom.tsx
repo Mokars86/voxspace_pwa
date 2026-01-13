@@ -7,11 +7,11 @@ import { useTheme } from '../../context/ThemeContext';
 import MessageBubble, { ChatMessage } from '../../components/chat/MessageBubble';
 import ChatInput from '../../components/chat/ChatInput';
 import ForwardModal from '../../components/chat/ForwardModal';
-import CallOverlay from '../../components/chat/CallOverlay';
 import ImageViewer from '../../components/ImageViewer';
-import { useWebRTC } from '../../hooks/useWebRTC';
+import { useCall } from '../../context/CallContext';
 import ErrorBoundary from '../../components/ErrorBoundary';
 import { cn } from '../../lib/utils';
+import { generateVideoThumbnail } from '../../lib/videoUtils';
 import {
     ArrowLeft, Phone, Video, MoreVertical, Loader2, Clock, Trash2, Pin, ChevronDown, User, Image as ImageIcon, Ban, ShieldAlert
 } from 'lucide-react';
@@ -62,12 +62,8 @@ const ChatRoom = () => {
     const [recordingUsers, setRecordingUsers] = useState<Set<string>>(new Set());
     const [isPartnerOnline, setIsPartnerOnline] = useState(false);
 
-    // Call Hook
-    const {
-        callState, callerInfo, isMuted, isVideoEnabled, isVideoCall,
-        localStream, remoteStream, startCall, answerCall, endCall,
-        toggleMute, toggleVideo
-    } = useWebRTC(user);
+    // Call Hook - Global
+    const { startCall } = useCall();
 
     const listRef = useRef<HTMLDivElement>(null);
     const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -230,7 +226,8 @@ const ChatRoom = () => {
                     expiresAt: m.expires_at,
                     viewOnce: m.view_once,
                     isViewed: m.is_viewed,
-                    isPinned: m.is_pinned
+                    isPinned: m.is_pinned,
+                    isEdited: m.is_edited
                 };
             });
             setMessages(formatted);
@@ -531,6 +528,28 @@ const ChatRoom = () => {
 
                 mediaUrls = await Promise.all(uploadPromises);
                 singleMediaUrl = mediaUrls[0];
+
+                // Video Thumbnail Logic
+                if (type === 'video' && fileList[0]) {
+                    try {
+                        const thumbBlob = await generateVideoThumbnail(fileList[0]);
+                        if (thumbBlob) {
+                            const thumbName = `chat_thumbs/${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`;
+                            const { error: thumbErr } = await supabase.storage
+                                .from('chat-attachments')
+                                .upload(thumbName, thumbBlob);
+
+                            if (!thumbErr) {
+                                const { data: thumbData } = supabase.storage
+                                    .from('chat-attachments')
+                                    .getPublicUrl(thumbName);
+                                finalMetadata.thumbnailUrl = thumbData.publicUrl;
+                            }
+                        }
+                    } catch (err) {
+                        console.error("Thumbnail generation failed", err);
+                    }
+                }
             }
 
             const { error } = await supabase.from('messages').insert({
@@ -620,12 +639,30 @@ const ChatRoom = () => {
     };
 
     const handleDeleteMessage = async (msgId: string) => {
+        const msgToDelete = messages.find(m => m.id === msgId);
+
         // Optimistic Update
         setMessages(prev => prev.map(m => m.id === msgId ? { ...m, isDeleted: true } : m));
 
         try {
-            await supabase.from('messages').update({ is_deleted: true }).eq('id', msgId);
-            await db.messages.update(msgId, { is_deleted: true });
+            // Delete Media File if exists
+            if (msgToDelete?.mediaUrl) {
+                // Extract file path from URL
+                // URL format: .../storage/v1/object/public/chat-attachments/chat_ID/filename
+                const parts = msgToDelete.mediaUrl.split('chat-attachments/');
+                if (parts.length === 2) {
+                    const filePath = parts[1];
+                    const { error: removeError } = await supabase.storage
+                        .from('chat-attachments')
+                        .remove([filePath]);
+
+                    if (removeError) console.error("Failed to remove media file", removeError);
+                }
+            }
+
+            // Mark as deleted in DB
+            await supabase.from('messages').update({ is_deleted: true, media_url: null, content: 'Message deleted' }).eq('id', msgId);
+            await db.messages.update(msgId, { is_deleted: true, media_url: '', content: 'Message deleted' });
         } catch (e) {
             console.error("Delete failed", e);
             // Revert (hard to revert delete perfectly without knowing old state, but typically network doesn't fail often here.
@@ -645,7 +682,7 @@ const ChatRoom = () => {
 
         try {
             await supabase.from('messages').update({ content: newText, is_edited: true }).eq('id', msgId);
-            await db.messages.update(msgId, { content: newText }); // Cache update
+            await db.messages.update(msgId, { content: newText, is_edited: true }); // Cache update
         } catch (e) {
             console.error("Edit failed", e);
             alert("Failed to edit message");
@@ -817,22 +854,7 @@ const ChatRoom = () => {
                     <div className="fixed inset-0 z-40 bg-transparent" onClick={() => setIsMenuOpen(false)} />
                 )}
 
-                <CallOverlay
-                    isOpen={callState !== 'idle'}
-                    state={callState}
-                    callerName={callerInfo?.name || 'Unknown'}
-                    callerAvatar={callerInfo?.avatar}
-                    isAudioEnabled={!isMuted}
-                    isVideoEnabled={isVideoEnabled}
-                    isVideoCall={isVideoCall || false}
-                    localStream={localStream}
-                    remoteStream={remoteStream}
-                    onToggleAudio={toggleMute}
-                    onToggleVideo={toggleVideo}
-                    onAccept={answerCall}
-                    onReject={endCall}
-                    onHangup={endCall}
-                />
+                {/* CallOverlay handled globally by CallProvider */}
 
                 <div className={cn("flex flex-col h-full bg-inherit", isBuzzing && "animate-shake")}>
                     {/* Header */}
@@ -883,8 +905,16 @@ const ChatRoom = () => {
                             </div>
                         </div>
                         <div className="flex items-center gap-4">
-                            <button onClick={() => startCall(chatId || '', 'User', '', false)}><Phone size={20} className="text-gray-600 dark:text-gray-300" /></button>
-                            <button onClick={() => startCall(chatId || '', 'User', '', true)}><Video size={20} className="text-gray-600 dark:text-gray-300" /></button>
+                            <button onClick={() => {
+                                if (!chatProfile?.id) { console.error("Call failed: No target user ID"); return; }
+                                console.log(`[ChatRoom] Starting AUDIO call to ${chatProfile.full_name} (${chatProfile.id})`);
+                                startCall(chatProfile.id, chatProfile.full_name || 'User', chatProfile.avatar_url || '', false);
+                            }}><Phone size={20} className="text-gray-600 dark:text-gray-300" /></button>
+                            <button onClick={() => {
+                                if (!chatProfile?.id) { console.error("Call failed: No target user ID"); return; }
+                                console.log(`[ChatRoom] Starting VIDEO call to ${chatProfile.full_name} (${chatProfile.id})`);
+                                startCall(chatProfile.id, chatProfile.full_name || 'User', chatProfile.avatar_url || '', true);
+                            }}><Video size={20} className="text-gray-600 dark:text-gray-300" /></button>
                             <div className="relative">
                                 <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors">
                                     <MoreVertical size={20} className="text-gray-600 dark:text-gray-300" />

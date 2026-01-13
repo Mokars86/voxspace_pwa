@@ -317,6 +317,62 @@ const SpaceDetail: React.FC = () => {
         };
 
         fetchSpace();
+
+        // Real-time Subscription for Posts
+        const channel = supabase
+            .channel(`space_posts:${id}`)
+            .on('postgres_changes', {
+                event: 'INSERT',
+                schema: 'public',
+                table: 'posts',
+                filter: `space_id=eq.${id}`
+            }, async (payload) => {
+                // Fetch the full post details (including author)
+                const { data, error } = await supabase
+                    .from('posts')
+                    .select(`*, profiles:user_id(full_name, username, avatar_url, is_verified), post_likes(user_id)`)
+                    .eq('id', payload.new.id)
+                    .single();
+
+                if (!error && data) {
+                    const newPost: Post = {
+                        id: data.id,
+                        author: {
+                            id: data.user_id,
+                            name: data.profiles?.full_name || 'Unknown',
+                            username: data.profiles?.username || 'user',
+                            avatar: data.profiles?.avatar_url || '',
+                            isVerified: data.profiles?.is_verified || false
+                        },
+                        content: data.content,
+                        timestamp: new Date(data.created_at).toLocaleDateString(),
+                        likes: data.likes_count,
+                        comments: data.comments_count,
+                        reposts: data.reposts_count,
+                        media: data.media_url,
+                        isLiked: user ? data.post_likes?.some((l: any) => l.user_id === user.id) : false,
+                        is_pinned: data.is_pinned
+                    };
+
+                    setPosts(prev => {
+                        // Check if we already have this post (e.g. from optimistic update)
+                        // This might replace an optimistic post with the real one if IDs match or if logic handles it.
+                        // Since optimistic uses 'temp-', we should keep it until we confirm... 
+                        // Actually, if we just prepend, we might have duplicates if we don't manage the temp ID.
+                        // But usually the real ID comes later. 
+                        // Implementation strategy: Just prepend. Optimistic post logic usually needs to be replaced 
+                        // but here handlePostSubmit fetches after insert which refreshes the list anyway. 
+                        // But for OTHER users, this is critical.
+                        if (prev.some(p => p.id === newPost.id)) return prev;
+                        return [newPost, ...prev];
+                    });
+                }
+            })
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
     }, [id, user]);
 
     const handleJoinLeave = async () => {
