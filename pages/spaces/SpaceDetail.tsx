@@ -47,7 +47,7 @@ const SpaceDetail: React.FC = () => {
     // Event State
     const [showEventModal, setShowEventModal] = useState(false);
     const [newEvent, setNewEvent] = useState({ title: '', description: '', start_time: '', location: '' });
-    const [viewingImage, setViewingImage] = useState<string | null>(null);
+    const [viewingImage, setViewingImage] = useState<{ url: string, type: 'image' | 'video' } | null>(null);
 
 
     const handleCreateEvent = async () => {
@@ -712,7 +712,7 @@ const SpaceDetail: React.FC = () => {
                                         post={post}
                                         onPin={isOwner ? handlePin : undefined}
                                         onDelete={handleDeletePost}
-                                        onMediaClick={(url) => setViewingImage(url)}
+                                        onMediaClick={(url, type) => setViewingImage({ url, type: type as 'image' | 'video' || 'image' })}
                                     />
                                 </div>
                             ))
@@ -830,7 +830,8 @@ const SpaceDetail: React.FC = () => {
             <ImageViewer
                 isOpen={!!viewingImage}
                 onClose={() => setViewingImage(null)}
-                src={viewingImage || ''}
+                src={viewingImage?.url || ''}
+                type={viewingImage?.type || 'image'}
             />
 
             {space && (

@@ -41,7 +41,7 @@ const CallOverlay: React.FC<CallOverlayProps> = ({
     const localVideoRef = useRef<HTMLVideoElement>(null);
     const remoteVideoRef = useRef<HTMLVideoElement>(null);
     const [isPlaying, setIsPlaying] = useState(false);
-    const audioRef = useRef<HTMLAudioElement>(null);
+
 
     // Timer Logic
     useEffect(() => {
@@ -80,42 +80,23 @@ const CallOverlay: React.FC<CallOverlayProps> = ({
         }
     }, [localStream, isOpen]);
 
-    const currentAudioTrackIdRef = useRef<string | null>(null);
-
+    // Unified Remote Media Handling
     useEffect(() => {
-        // Audio Handling: Stable assignment
-        if (audioRef.current && remoteStream) {
-            const audioTracks = remoteStream.getAudioTracks();
-            if (audioTracks.length > 0) {
-                const track = audioTracks[0];
-                if (currentAudioTrackIdRef.current !== track.id) {
-                    currentAudioTrackIdRef.current = track.id;
-                    const audioStream = new MediaStream([track]);
-                    audioRef.current.srcObject = audioStream;
-                    audioRef.current.onloadedmetadata = () => {
-                        audioRef.current!.muted = false;
-                        audioRef.current!.volume = 1.0;
-                        attemptPlay(audioRef.current!);
-                    };
-                }
-            }
-        }
-
-        // Video Handling
-        if (remoteVideoRef.current && remoteStream && isVideoCall) {
-            const videoTracks = remoteStream.getVideoTracks();
-            if (videoTracks.length > 0) {
-                const videoStream = new MediaStream(videoTracks);
-                remoteVideoRef.current.srcObject = videoStream;
+        if (remoteVideoRef.current) {
+            if (remoteStream) {
+                console.log("[CallOverlay] Attaching remote stream to video element", remoteStream.getTracks().map(t => t.kind));
+                remoteVideoRef.current.srcObject = remoteStream;
                 remoteVideoRef.current.onloadedmetadata = () => {
-                    remoteVideoRef.current!.muted = true;
+                    // Ensure unmuted so we can hear audio!
+                    remoteVideoRef.current!.muted = false;
+                    remoteVideoRef.current!.volume = 1.0;
                     attemptPlay(remoteVideoRef.current!);
                 };
+            } else {
+                remoteVideoRef.current.srcObject = null;
             }
-        } else if (remoteVideoRef.current && !isVideoCall) {
-            remoteVideoRef.current.srcObject = null;
         }
-    }, [remoteStream, isOpen, isVideoCall]);
+    }, [remoteStream, isOpen]);
 
     const formatDuration = (sec: number) => {
         const m = Math.floor(sec / 60);
@@ -134,18 +115,16 @@ const CallOverlay: React.FC<CallOverlayProps> = ({
     return (
         <div className={cn("fixed inset-0 z-[99999] backdrop-blur-sm flex flex-col items-center justify-center text-white animate-in fade-in duration-300 overflow-hidden", isVideoCall ? "bg-black/50" : "bg-gray-900/95")}>
 
-            {/* Background Video (Remote) */}
-            {isVideoCall && (
-                <div className="absolute inset-0 z-[-1] bg-black">
-                    {/* If connected and have stream, show video. Else show avatar-based placeholder? For now just black/video */}
-                    <video
-                        ref={remoteVideoRef}
-                        autoPlay
-                        playsInline
-                        className={cn("w-full h-full object-cover transition-opacity duration-300", state === 'connected' ? "opacity-100" : "opacity-30")}
-                    />
-                </div>
-            )}
+            {/* Background Video (Remote) - Always render for audio playback */}
+            <div className="absolute inset-0 z-[-1] bg-black">
+                <video
+                    ref={remoteVideoRef}
+                    autoPlay
+                    playsInline
+                    className={cn("w-full h-full object-cover transition-opacity duration-300",
+                        state === 'connected' && isVideoCall ? "opacity-100" : "opacity-0")}
+                />
+            </div>
 
             {/* Local Video (PIP) */}
             {isVideoCall && state === 'connected' && (
@@ -187,8 +166,7 @@ const CallOverlay: React.FC<CallOverlayProps> = ({
                 </div>
             </div>
 
-            {/* Hidden Audio Element for reliable playback */}
-            <audio ref={audioRef} autoPlay playsInline hidden />
+
 
             {/* Fallback "Tap to Play" if autoplay blocked */}
             {!isPlaying && state === 'connected' && (
@@ -196,7 +174,6 @@ const CallOverlay: React.FC<CallOverlayProps> = ({
                     <button
                         onClick={() => {
                             if (remoteVideoRef.current) attemptPlay(remoteVideoRef.current);
-                            if (audioRef.current) attemptPlay(audioRef.current);
                             if (localVideoRef.current) attemptPlay(localVideoRef.current);
                         }}
                         className="px-6 py-3 bg-blue-600 rounded-full text-white font-bold shadow-2xl animate-bounce"

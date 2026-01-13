@@ -3,11 +3,12 @@ import { X, Shield, Trash2, Download, LogOut, KeyRound, ArrowLeft } from 'lucide
 import { useNavigate } from 'react-router-dom';
 import { db } from '../../services/db';
 
+
 interface BagSettingsModalProps {
     isOpen: boolean;
     onClose: () => void;
     onLock: () => void;
-    onChangePin: (oldPin: string, newPin: string) => boolean;
+    onChangePin: (oldPin: string, newPin: string) => Promise<boolean>;
 }
 
 const BagSettingsModal: React.FC<BagSettingsModalProps> = ({ isOpen, onClose, onLock, onChangePin }) => {
@@ -65,7 +66,7 @@ const BagSettingsModal: React.FC<BagSettingsModalProps> = ({ isOpen, onClose, on
         }
     };
 
-    const handlePinSubmit = (e: React.FormEvent) => {
+    const handlePinSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (pinInput.length !== 4) return;
 
@@ -86,7 +87,7 @@ const BagSettingsModal: React.FC<BagSettingsModalProps> = ({ isOpen, onClose, on
                 return;
             }
             // Execute Change
-            const success = onChangePin(oldPin, pinInput);
+            const success = await onChangePin(oldPin, pinInput);
             if (success) {
                 alert("PIN changed successfully!");
                 resetState();

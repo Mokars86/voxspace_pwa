@@ -24,11 +24,8 @@ const DataSettings: React.FC = () => {
     const [isClearing, setIsClearing] = useState(false);
 
     useEffect(() => {
-        // Mock calculation of cache size
-        const timer = setTimeout(() => {
-            setCacheSize("142.5 MB");
-        }, 800);
-        return () => clearTimeout(timer);
+        // Real implementation would calculate cache size
+        setCacheSize("Unknown");
     }, []);
 
     const handleClearCache = () => {

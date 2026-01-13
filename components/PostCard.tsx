@@ -15,7 +15,7 @@ interface PostCardProps {
     post: Post;
     onDelete?: (id: string) => void;
     onPin?: (id: string) => void;
-    onMediaClick?: (url: string) => void;
+    onMediaClick?: (url: string, type?: string) => void;
 }
 
 interface CommentItemProps {
@@ -88,6 +88,10 @@ const PostCard: React.FC<PostCardProps> = ({ post, onDelete, onPin, onMediaClick
     const [repostCount, setRepostCount] = useState(post.reposts || 0);
     const [menuOpen, setMenuOpen] = useState(false);
     const [isReposting, setIsReposting] = useState(false);
+
+    // Poll State
+    const [localVote, setLocalVote] = useState(post.user_vote);
+    useEffect(() => setLocalVote(post.user_vote), [post.user_vote]);
 
     // Edit Mode
     const [isEditing, setIsEditing] = useState(false);
@@ -432,7 +436,8 @@ const PostCard: React.FC<PostCardProps> = ({ post, onDelete, onPin, onMediaClick
                             className="mt-3 rounded-2xl overflow-hidden border border-gray-100 dark:border-gray-700 cursor-pointer max-w-lg shadow-sm hover:shadow-md transition-shadow"
                             onClick={(e) => {
                                 e.stopPropagation();
-                                if (onMediaClick) onMediaClick(post.media!);
+                                if (post.media_type === 'audio') return; // Don't open viewer for audio
+                                if (onMediaClick) onMediaClick(post.media!, post.media_type || 'image');
                             }}
                         >
                             {post.media_type === 'video' ? (
@@ -447,6 +452,66 @@ const PostCard: React.FC<PostCardProps> = ({ post, onDelete, onPin, onMediaClick
                             ) : (
                                 <img src={post.media} alt="Post media" className="w-full h-full object-cover max-h-[500px]" />
                             )}
+                        </div>
+                    )}
+
+                    {/* Polls */}
+                    {post.poll_options && post.poll_options.length > 0 && (
+                        <div className="mt-3 max-w-lg space-y-2 animate-in fade-in">
+                            {(() => {
+                                const totalVotes = post.poll_options.reduce((acc, curr) => acc + (curr.count || 0), 0);
+                                const hasVoted = localVote !== null && localVote !== undefined;
+
+                                return post.poll_options.map((option, idx) => {
+                                    const count = option.count || 0;
+                                    const percentage = totalVotes > 0 ? Math.round((count / totalVotes) * 100) : 0;
+                                    const isSelected = localVote === idx;
+
+                                    return (
+                                        <div
+                                            key={idx}
+                                            onClick={async (e) => {
+                                                e.stopPropagation();
+                                                if (hasVoted || !user) return;
+
+                                                // Optimistic update
+                                                setLocalVote(idx);
+
+                                                try {
+                                                    await supabase.from('poll_votes').insert({
+                                                        post_id: post.id,
+                                                        user_id: user.id,
+                                                        option_index: idx
+                                                    });
+                                                } catch (err) {
+                                                    console.error("Vote failed", err);
+                                                    setLocalVote(null); // Revert
+                                                }
+                                            }}
+                                            className={`relative overflow-hidden rounded-xl border ${hasVoted ? 'border-transparent bg-gray-100 dark:bg-gray-800' : 'border-[#ff1744] hover:bg-red-50 dark:hover:bg-red-900/10 cursor-pointer'} transition-all`}
+                                        >
+                                            {hasVoted && (
+                                                <div
+                                                    className={`absolute inset-y-0 left-0 ${isSelected ? 'bg-[#ff1744]/20' : 'bg-gray-200 dark:bg-gray-700'} transition-all duration-500`}
+                                                    style={{ width: `${percentage}%` }}
+                                                />
+                                            )}
+                                            <div className="relative px-4 py-3 flex justify-between items-center z-10">
+                                                <span className={`font-medium ${hasVoted && isSelected ? 'text-[#ff1744]' : 'text-gray-900 dark:text-white'}`}>
+                                                    {option.text}
+                                                    {isSelected && <span className="ml-2 text-xs">✓</span>}
+                                                </span>
+                                                {hasVoted && (
+                                                    <span className="text-sm text-gray-500 font-bold">{percentage}%</span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    );
+                                });
+                            })()}
+                            <div className="text-xs text-gray-400 pl-1">
+                                {post.poll_options.reduce((acc, curr) => acc + (curr.count || 0), 0)} votes
+                            </div>
                         </div>
                     )}
 

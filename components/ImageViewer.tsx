@@ -5,11 +5,12 @@ interface ImageViewerProps {
     isOpen: boolean;
     onClose: () => void;
     src?: string;
+    type?: 'image' | 'video';
     images?: string[]; // Array of URLs
     alt?: string;
 }
 
-const ImageViewer: React.FC<ImageViewerProps> = ({ isOpen, onClose, src, images, alt }) => {
+const ImageViewer: React.FC<ImageViewerProps> = ({ isOpen, onClose, src, type = 'image', images, alt }) => {
     const [scale, setScale] = React.useState(1);
     const [position, setPosition] = React.useState({ x: 0, y: 0 });
     const [isDragging, setIsDragging] = React.useState(false);
@@ -44,8 +45,9 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ isOpen, onClose, src, images,
         }
     };
 
-    // Zoom Controls
+    // Zoom Controls (Image Only)
     const handleZoomStep = (step: number) => {
+        if (type === 'video') return;
         const newScale = Math.min(Math.max(1, scale + step), 4);
         setScale(newScale);
         if (newScale === 1) setPosition({ x: 0, y: 0 });
@@ -62,7 +64,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ isOpen, onClose, src, images,
     };
 
     const handleTouchStart = (e: React.TouchEvent) => {
-        if (e.touches.length === 2) {
+        if (e.touches.length === 2 && type !== 'video') {
             // Pinch Start
             const dist = getTouchDist(e.touches);
             touchStart.current = { x: 0, dist }; // We only care about dist for pinch
@@ -73,13 +75,10 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ isOpen, onClose, src, images,
     };
 
     const handleTouchMove = (e: React.TouchEvent) => {
-        if (e.touches.length === 2 && touchStart.current) {
+        if (e.touches.length === 2 && touchStart.current && type !== 'video') {
             // Pinch Move
             const dist = getTouchDist(e.touches);
             const scaleChange = dist / touchStart.current.dist;
-            // Simple pinch zoom: adjusting scale relative to previous pinch start
-            // To make it smoother we might want to track initial scale
-            // simplified:
             const newScale = Math.min(Math.max(1, scale * scaleChange), 4);
             setScale(newScale);
         }
@@ -88,7 +87,6 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ isOpen, onClose, src, images,
     const handleTouchEnd = (e: React.TouchEvent) => {
         if (touchStart.current && e.changedTouches.length === 1 && scale === 1 && e.touches.length === 0) {
             // Swipe End Logic
-            // Only if we weren't pinching
             if (touchStart.current.dist === 0) {
                 const diff = e.changedTouches[0].clientX - touchStart.current.x;
                 if (Math.abs(diff) > 50) {
@@ -108,12 +106,12 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ isOpen, onClose, src, images,
             if (e.key === 'ArrowRight') navigate(1);
             if (e.key === 'ArrowLeft') navigate(-1);
             if (e.key === 'Escape') onClose();
-            if (e.key === '+' || e.key === '=') handleZoomStep(0.5);
-            if (e.key === '-') handleZoomStep(-0.5);
+            if (type !== 'video' && (e.key === '+' || e.key === '=')) handleZoomStep(0.5);
+            if (type !== 'video' && e.key === '-') handleZoomStep(-0.5);
         };
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [isOpen, currentIndex, allImages, scale]);
+    }, [isOpen, currentIndex, allImages, scale, type]);
 
 
     if (!isOpen || allImages.length === 0) return null;
@@ -122,6 +120,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ isOpen, onClose, src, images,
 
     // Mouse Wheel Zoom
     const handleWheel = (e: React.WheelEvent) => {
+        if (type === 'video') return;
         e.stopPropagation();
         const delta = e.deltaY * -0.01;
         const newScale = Math.min(Math.max(1, scale + delta), 4);
@@ -131,7 +130,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ isOpen, onClose, src, images,
 
     // Pan (Drag) Logic
     const handleMouseDown = (e: React.MouseEvent) => {
-        if (scale > 1) {
+        if (scale > 1 && type !== 'video') {
             e.preventDefault();
             setIsDragging(true);
             dragStart.current = { x: e.clientX - position.x, y: e.clientY - position.y };
@@ -151,6 +150,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ isOpen, onClose, src, images,
     const handleMouseUp = () => setIsDragging(false);
 
     const handleDoubleClick = (e: React.MouseEvent) => {
+        if (type === 'video') return;
         e.stopPropagation();
         if (scale > 1) {
             setScale(1);
@@ -159,6 +159,8 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ isOpen, onClose, src, images,
             setScale(2.5);
         }
     };
+
+    const isVideo = type === 'video' || currentSrc?.toLowerCase().endsWith('.mp4') || currentSrc?.toLowerCase().endsWith('.webm');
 
     return (
         <div
@@ -175,26 +177,28 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ isOpen, onClose, src, images,
                     {currentIndex + 1} / {allImages.length}
                 </span>
 
-                <div className="flex items-center gap-1 bg-white/10 rounded-full p-1 border border-white/10 backdrop-blur-sm">
-                    <button
-                        onClick={(e) => { e.stopPropagation(); handleZoomStep(-0.5); }}
-                        className="p-2 hover:bg-white/20 rounded-full text-white transition-colors"
-                        title="Zoom Out"
-                    >
-                        <ZoomOut size={20} />
-                    </button>
-                    <button
-                        onClick={(e) => { e.stopPropagation(); handleZoomStep(0.5); }}
-                        className="p-2 hover:bg-white/20 rounded-full text-white transition-colors"
-                        title="Zoom In"
-                    >
-                        <ZoomIn size={20} />
-                    </button>
-                </div>
+                {!isVideo && (
+                    <div className="flex items-center gap-1 bg-white/10 rounded-full p-1 border border-white/10 backdrop-blur-sm">
+                        <button
+                            onClick={(e) => { e.stopPropagation(); handleZoomStep(-0.5); }}
+                            className="p-2 hover:bg-white/20 rounded-full text-white transition-colors"
+                            title="Zoom Out"
+                        >
+                            <ZoomOut size={20} />
+                        </button>
+                        <button
+                            onClick={(e) => { e.stopPropagation(); handleZoomStep(0.5); }}
+                            className="p-2 hover:bg-white/20 rounded-full text-white transition-colors"
+                            title="Zoom In"
+                        >
+                            <ZoomIn size={20} />
+                        </button>
+                    </div>
+                )}
 
                 <a
                     href={currentSrc}
-                    download={`voxspace_image_${currentIndex}.jpg`}
+                    download={`voxspace_media_${currentIndex}.${isVideo ? 'mp4' : 'jpg'}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="p-2 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors"
@@ -238,22 +242,33 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ isOpen, onClose, src, images,
                     </>
                 )}
 
-                <img
-                    key={currentSrc}
-                    src={currentSrc}
-                    alt={alt || "Preview"}
-                    className="max-h-[90vh] max-w-[90vw] object-contain transition-transform duration-75 ease-linear"
-                    style={{
-                        transform: `scale(${scale}) translate(${position.x / scale}px, ${position.y / scale}px)`,
-                        cursor: scale > 1 ? (isDragging ? 'grabbing' : 'grab') : 'zoom-in'
-                    }}
-                    onClick={(e) => e.stopPropagation()}
-                    onMouseDown={handleMouseDown}
-                    onMouseMove={handleMouseMove}
-                    onMouseUp={handleMouseUp}
-                    onMouseLeave={handleMouseUp}
-                    draggable={false}
-                />
+                {isVideo ? (
+                    <video
+                        key={currentSrc}
+                        src={currentSrc}
+                        controls
+                        autoPlay
+                        className="max-h-[90vh] max-w-[90vw] object-contain shadow-2xl"
+                        onClick={(e) => e.stopPropagation()} // Allow clicking controls without closing
+                    />
+                ) : (
+                    <img
+                        key={currentSrc}
+                        src={currentSrc}
+                        alt={alt || "Preview"}
+                        className="max-h-[90vh] max-w-[90vw] object-contain transition-transform duration-75 ease-linear"
+                        style={{
+                            transform: `scale(${scale}) translate(${position.x / scale}px, ${position.y / scale}px)`,
+                            cursor: scale > 1 ? (isDragging ? 'grabbing' : 'grab') : 'zoom-in'
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                        onMouseDown={handleMouseDown}
+                        onMouseMove={handleMouseMove}
+                        onMouseUp={handleMouseUp}
+                        onMouseLeave={handleMouseUp}
+                        draggable={false}
+                    />
+                )}
             </div>
 
             {/* Mobile Footer Counter */}

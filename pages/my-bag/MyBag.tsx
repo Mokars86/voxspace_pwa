@@ -30,9 +30,27 @@ const MyBag: React.FC = () => {
     const isExempt = profile?.full_name && EXEMPT_USERS.includes(profile.full_name);
     const MAX_STORAGE_BYTES = isExempt ? Infinity : 50 * 1024 * 1024; // 50MB or Unlimited
 
-    // Mock PIN - In reality, fetch hashed PIN from secure storage or require App Auth
     // PIN Management
-    const [currentPin, setCurrentPin] = useState(() => localStorage.getItem('voxspace_bag_pin') || '1234');
+    const [currentPin, setCurrentPin] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (user) {
+            // Fetch PIN from profile
+            supabase.from('profiles').select('chat_lock_pin').eq('id', user.id).single()
+                .then(({ data }) => {
+                    if (data?.chat_lock_pin) {
+                        setCurrentPin(data.chat_lock_pin);
+                    } else {
+                        // If no PIN set, maybe allow access or prompt setup? 
+                        // For now, let's keep it locked but maybe default pin is not usable?
+                        // If null, we might consider it 'no pin' -> unlocked or '1234' default?
+                        // Let's assume unlocked if no PIN, or standard '1234' fallback if user wants lock functionality.
+                        // Better: If no PIN, treat as '1234' for simplified migration or ask to setup.
+                        setCurrentPin('1234');
+                    }
+                });
+        }
+    }, [user]);
 
     useEffect(() => {
         if (!isLocked && user) {
@@ -95,11 +113,18 @@ const MyBag: React.FC = () => {
         }
     };
 
-    const handleChangePin = (oldPin: string, newPin: string): boolean => {
+    const handleChangePin = async (oldPin: string, newPin: string): Promise<boolean> => {
         if (oldPin === currentPin) {
-            localStorage.setItem('voxspace_bag_pin', newPin);
-            setCurrentPin(newPin);
-            return true;
+            try {
+                const { error } = await supabase.from('profiles').update({ chat_lock_pin: newPin }).eq('id', user!.id);
+                if (error) throw error;
+                setCurrentPin(newPin);
+                return true;
+            } catch (e) {
+                console.error("Failed to update PIN", e);
+                alert("Failed to update PIN");
+                return false;
+            }
         }
         return false;
     };

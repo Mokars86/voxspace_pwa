@@ -14,12 +14,38 @@ const ChatView: React.FC = () => {
   const [chats, setChats] = useState<ChatPreview[]>([]);
   const [loading, setLoading] = useState(true);
   const location = useLocation();
-  const [activeTab, setActiveTab] = useState<'all' | 'requests' | 'archived'>((location.state as any)?.tab || 'all');
-  const [viewMode, setViewMode] = useState<'chats' | 'calls'>('chats');
+  const [activeTab, setActiveTab] = useState<'all' | 'requests' | 'archived' | 'calls'>((location.state as any)?.tab || 'all');
   const [callLogs, setCallLogs] = useState<any[]>([]);
   const [missedCallsCount, setMissedCallsCount] = useState(0);
 
-  // Lock specific state
+  // Badge timestamps
+  const [lastViewedRequests, setLastViewedRequests] = useState(() => localStorage.getItem('lastViewedRequests') || new Date(0).toISOString());
+
+  const handleTabChange = async (tab: 'all' | 'requests' | 'archived' | 'calls') => {
+    setActiveTab(tab);
+    const now = new Date().toISOString();
+
+    if (tab === 'calls') {
+      // Mark all missed, unviewed calls as viewed in DB
+      setMissedCallsCount(0); // Optimistic clear
+      if (user) {
+        supabase.from('call_logs')
+          .update({ is_viewed: true })
+          .eq('status', 'missed')
+          .eq('is_viewed', false)
+          .neq('caller_id', user.id)
+          .then(({ error }) => {
+            if (error) console.error("Error marking calls as viewed", error);
+          });
+      }
+    }
+
+    if (tab === 'requests') {
+      localStorage.setItem('lastViewedRequests', now);
+      setLastViewedRequests(now);
+    }
+  };
+
   const [pinModal, setPinModal] = useState<{ isOpen: boolean, mode: 'create' | 'enter' | 'confirm', chatId?: string, action?: 'open' | 'toggleLock' }>({ isOpen: false, mode: 'enter' });
   const [userPin, setUserPin] = useState<string | null>(null);
 
@@ -57,13 +83,13 @@ const ChatView: React.FC = () => {
   const fetchMissedCallsCount = async () => {
     if (!user) return;
     try {
-      // Count missed incoming calls 
-      // Assuming 'status' is 'missed' and caller is NOT me.
+      // Count missed incoming calls that are NOT viewed
       const { count, error } = await supabase
         .from('call_logs')
         .select('*', { count: 'exact', head: true })
         .eq('status', 'missed')
-        .neq('caller_id', user.id);
+        .neq('caller_id', user.id)
+        .eq('is_viewed', false);
 
       if (!error && count !== null) {
         setMissedCallsCount(count);
@@ -74,18 +100,17 @@ const ChatView: React.FC = () => {
   };
 
   useEffect(() => {
-    if (viewMode === 'chats') {
-      fetchChats();
+    if (activeTab === 'calls') {
+      fetchCallLogs();
+      // Don't fetch count if we are ON the tab, we want it cleared.
+      // But actually, we might want to see new ones coming in LIVE.
+      // The handleTabChange sets local variable, which affects query.
       fetchMissedCallsCount();
     } else {
-      // When entering calls view, we might want to reset the count or keep it?
-      // Usually reset if viewed. For now just fetch logs.
-      fetchCallLogs();
-      // Optionally mark as viewed to clear count? 
-      // For now let's keep it simple: just fetch.
-      fetchMissedCallsCount(); // Keep count updated
+      fetchChats();
+      fetchMissedCallsCount();
     }
-  }, [user, viewMode]);
+  }, [user, activeTab]); // Removed lastViewedCalls dependency
 
   const fetchChats = async () => {
     if (!user) return;
@@ -94,7 +119,7 @@ const ChatView: React.FC = () => {
       // 1. Get all chats where the current user is a participant
       const { data: myChats, error: myChatsError } = await supabase
         .from('chat_participants')
-        .select('chat_id, is_archived, is_pinned, is_locked, status, chats(id, name, is_group)')
+        .select('chat_id, is_archived, is_pinned, is_locked, status, chats(id, name, is_group, created_at)')
         .eq('user_id', user.id);
 
       if (myChatsError) throw myChatsError;
@@ -191,7 +216,8 @@ const ChatView: React.FC = () => {
           isPinned: myChat.is_pinned,
           isLocked: myChat.is_locked,
           isGroup: chatInfo?.is_group ?? false,
-          status: myChat.status || 'accepted'
+          status: myChat.status || 'accepted',
+          createdAt: chatInfo?.created_at // Use chat creation as fallback for request time
         };
       });
 
@@ -207,7 +233,7 @@ const ChatView: React.FC = () => {
   useEffect(() => {
     // Initial fetch handled by viewMode effect
     // But we also need realtime updates for the chat list (unread counts, new messages)
-    if (!user || viewMode !== 'chats') return;
+    if (!user) return;
 
     const channel = supabase
       .channel('chat_list_updates')
@@ -232,8 +258,6 @@ const ChatView: React.FC = () => {
       )
       .subscribe();
 
-    // Separate channel for call logs maybe? Or just poll/fetch on mount.
-    // Ideally we listen to call_logs inserts too.
     const callChannel = supabase
       .channel('call_notifications')
       .on(
@@ -247,7 +271,7 @@ const ChatView: React.FC = () => {
       supabase.removeChannel(channel);
       supabase.removeChannel(callChannel);
     };
-  }, [user, viewMode]);
+  }, [user]);
 
   const handleArchive = async (e: React.MouseEvent, chatId: string, currentStatus: boolean) => {
     e.stopPropagation();
@@ -449,51 +473,41 @@ const ChatView: React.FC = () => {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <h2 className="text-2xl font-bold tracking-tight dark:text-white">
-              {viewMode === 'chats' ? 'Chats' : 'Calls'}
+              Chats
             </h2>
-            <div className="flex bg-gray-100 dark:bg-gray-800 p-1 rounded-lg">
-              <button
-                onClick={() => setViewMode('chats')}
-                className={cn("p-1.5 rounded-md transition-all", viewMode === 'chats' ? "bg-white dark:bg-gray-700 shadow-sm" : "text-gray-400")}
-              >
-                <CheckCheck size={16} />
-              </button>
-              <button
-                onClick={() => setViewMode('calls')}
-                className={cn("p-1.5 rounded-md transition-all", viewMode === 'calls' ? "bg-white dark:bg-gray-700 shadow-sm" : "text-gray-400")}
-              >
-                <Phone size={16} />
-                {missedCallsCount > 0 && (
-                  <span className="absolute -top-1.5 -right-1.5 bg-[#ff1744] text-white text-[10px] min-w-[16px] h-[16px] flex items-center justify-center rounded-full border-2 border-white dark:border-gray-800 shadow-sm animate-in zoom-in font-bold">
-                    {missedCallsCount}
-                  </span>
-                )}
-              </button>
-            </div>
           </div>
 
-          {viewMode === 'chats' && (
-            <div className="flex bg-gray-100 dark:bg-gray-800 p-1 rounded-full text-sm">
-              <button
-                onClick={() => setActiveTab('all')}
-                className={cn("px-4 py-1 rounded-full text-xs font-bold transition-all", activeTab === 'all' ? "bg-white dark:bg-gray-700 text-black dark:text-white shadow-sm" : "text-gray-500 dark:text-gray-400")}
-              >
-                All
-              </button>
-              <button
-                onClick={() => setActiveTab('requests')}
-                className={cn("px-4 py-1 rounded-full text-xs font-bold transition-all", activeTab === 'requests' ? "bg-white dark:bg-gray-700 text-black dark:text-white shadow-sm" : "text-gray-500 dark:text-gray-400")}
-              >
-                Requests
-                {chats.filter(c => c.status === 'pending').length > 0 && (
-                  <span className="ml-2 bg-[#ff1744] text-white text-[10px] px-2 py-0.5 rounded-full shadow-sm animate-in zoom-in">
-                    {chats.filter(c => c.status === 'pending').length}
-                  </span>
-                )}
-              </button>
+          <div className="flex bg-gray-100 dark:bg-gray-800 p-1 rounded-full text-sm">
+            <button
+              onClick={() => handleTabChange('all')}
+              className={cn("px-4 py-1 rounded-full text-xs font-bold transition-all", activeTab === 'all' ? "bg-white dark:bg-gray-700 text-black dark:text-white shadow-sm" : "text-gray-500 dark:text-gray-400")}
+            >
+              All
+            </button>
+            <button
+              onClick={() => handleTabChange('calls')}
+              className={cn("px-4 py-1 rounded-full text-xs font-bold transition-all relative", activeTab === 'calls' ? "bg-white dark:bg-gray-700 text-black dark:text-white shadow-sm" : "text-gray-500 dark:text-gray-400")}
+            >
+              Calls
+              {missedCallsCount > 0 && (
+                <span className="ml-2 bg-[#ff1744] text-white text-[10px] px-2 py-0.5 rounded-full shadow-sm animate-in zoom-in">
+                  {missedCallsCount}
+                </span>
+              )}
+            </button>
+            <button
+              onClick={() => handleTabChange('requests')}
+              className={cn("px-4 py-1 rounded-full text-xs font-bold transition-all", activeTab === 'requests' ? "bg-white dark:bg-gray-700 text-black dark:text-white shadow-sm" : "text-gray-500 dark:text-gray-400")}
+            >
+              Requests
+              {chats.filter(c => c.status === 'pending' && (!c.createdAt || c.createdAt > lastViewedRequests)).length > 0 && (
+                <span className="ml-2 bg-[#ff1744] text-white text-[10px] px-2 py-0.5 rounded-full shadow-sm animate-in zoom-in">
+                  {chats.filter(c => c.status === 'pending' && (!c.createdAt || c.createdAt > lastViewedRequests)).length}
+                </span>
+              )}
+            </button>
 
-            </div>
-          )}
+          </div>
         </div>
 
         <div className="relative">
@@ -513,7 +527,7 @@ const ChatView: React.FC = () => {
           <div className="flex py-12 justify-center">
             <Loader2 className="animate-spin text-gray-300" />
           </div>
-        ) : viewMode === 'calls' ? (
+        ) : activeTab === 'calls' ? (
           <div className="flex flex-col">
             {callLogs.length === 0 ? (
               <div className="text-center py-10 text-gray-400">No recent calls</div>

@@ -24,6 +24,8 @@ export interface Post {
   repostAuthor?: string;
   space_id?: string;
   is_pinned?: boolean;
+  poll_options?: { text: string; count: number }[];
+  user_vote?: number | null;
 }
 
 export interface SpaceEvent {

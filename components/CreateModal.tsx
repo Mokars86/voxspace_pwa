@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { X, Image, Music, MapPin, Smile, Send, Loader2 } from 'lucide-react';
+import { X, Image, Music, MapPin, Smile, Send, Loader2, Video, BarChart2, Plus } from 'lucide-react';
+import EmojiPicker, { EmojiClickData } from 'emoji-picker-react';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../context/AuthContext';
 
@@ -13,14 +14,21 @@ const CreateModal: React.FC<CreateModalProps> = ({ onClose }) => {
   const [isPosting, setIsPosting] = useState(false);
 
   // Media Upload State
-  const [selectedMedia, setSelectedMedia] = useState<{ file: File, type: 'image' | 'video' } | null>(null);
+  const [selectedMedia, setSelectedMedia] = useState<{ file: File, type: 'image' | 'video' | 'audio' } | null>(null);
   const [mediaPreview, setMediaPreview] = useState<string | null>(null);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+
+  // Poll State
+  const [isPollMode, setIsPollMode] = useState(false);
+  const [pollOptions, setPollOptions] = useState<string[]>(['', '']);
+
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const audioInputRef = React.useRef<HTMLInputElement>(null);
 
   const handleMediaSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
-      const type = file.type.startsWith('video/') ? 'video' : 'image';
+      const type = file.type.startsWith('video/') ? 'video' : file.type.startsWith('audio/') ? 'audio' : 'image';
       setSelectedMedia({ file, type });
       // Create preview URL
       const url = URL.createObjectURL(file);
@@ -33,10 +41,16 @@ const CreateModal: React.FC<CreateModalProps> = ({ onClose }) => {
     if (mediaPreview) URL.revokeObjectURL(mediaPreview);
     setMediaPreview(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
+    if (audioInputRef.current) audioInputRef.current.value = '';
+    setShowEmojiPicker(false);
   };
 
   const handlePost = async () => {
-    if ((!content.trim() && !selectedMedia) || !user) return;
+    if ((!content.trim() && !selectedMedia && !isPollMode) || !user) return;
+    if (isPollMode && pollOptions.filter(o => o.trim()).length < 2) {
+      alert("Please add at least 2 poll options.");
+      return;
+    }
     setIsPosting(true);
 
     try {
@@ -44,6 +58,7 @@ const CreateModal: React.FC<CreateModalProps> = ({ onClose }) => {
 
       // 1. Upload Media if selected
       if (selectedMedia) {
+        // ... (upload logic unchanged)
         const fileExt = selectedMedia.file.name.split('.').pop();
         const fileName = `${user.id}/${Math.random()}.${fileExt}`;
 
@@ -53,7 +68,6 @@ const CreateModal: React.FC<CreateModalProps> = ({ onClose }) => {
 
         if (uploadError) throw uploadError;
 
-        // Get Public URL
         const { data: { publicUrl } } = supabase.storage
           .from('post_media')
           .getPublicUrl(fileName);
@@ -66,11 +80,18 @@ const CreateModal: React.FC<CreateModalProps> = ({ onClose }) => {
         user_id: user.id,
         content: content,
         media_url: mediaUrl,
-        media_type: selectedMedia?.type
+        media_type: selectedMedia?.type,
+        poll_options: isPollMode ? pollOptions.filter(o => o.trim()).map(text => ({ text, count: 0 })) : undefined
       });
 
       if (error) throw error;
+
+      // Cleanup
       onClose();
+      setContent('');
+      removeMedia();
+      setIsPollMode(false);
+      setPollOptions(['', '']);
     } catch (error) {
       console.error("Error creating post:", error);
       alert("Failed to post");
@@ -108,19 +129,80 @@ const CreateModal: React.FC<CreateModalProps> = ({ onClose }) => {
               value={content}
               onChange={(e) => setContent(e.target.value)}
             />
+            {isPollMode && (
+              <div className="mt-3 space-y-2 animate-in fade-in slide-in-from-top-2 w-full">
+                {pollOptions.map((option, idx) => (
+                  <div key={idx} className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder={`Option ${idx + 1}`}
+                      value={option}
+                      onChange={(e) => {
+                        const newOptions = [...pollOptions];
+                        newOptions[idx] = e.target.value;
+                        setPollOptions(newOptions);
+                      }}
+                      className="flex-1 bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-[#ff1744] transition-colors dark:text-white"
+                    />
+                    {pollOptions.length > 2 && (
+                      <button
+                        onClick={() => setPollOptions(pollOptions.filter((_, i) => i !== idx))}
+                        className="text-gray-400 hover:text-red-500 p-2"
+                      >
+                        <X size={16} />
+                      </button>
+                    )}
+                  </div>
+                ))}
+                {pollOptions.length < 4 && (
+                  <button
+                    onClick={() => setPollOptions([...pollOptions, ''])}
+                    className="text-[#ff1744] text-sm font-medium hover:underline flex items-center gap-1"
+                  >
+                    <Plus size={14} /> Add Option
+                  </button>
+                )}
+              </div>
+            )}
+
             {mediaPreview && (
-              <div className="relative mt-2 rounded-2xl overflow-hidden group">
+              <div className="relative mt-2 rounded-2xl overflow-hidden group w-full bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700">
                 {selectedMedia?.type === 'video' ? (
                   <video src={mediaPreview} className="w-full max-h-[300px] object-cover" controls />
+                ) : selectedMedia?.type === 'audio' ? (
+                  <div className="p-4 flex items-center gap-3">
+                    <div className="w-10 h-10 bg-[#ff1744] rounded-full flex items-center justify-center text-white">
+                      <Music size={20} />
+                    </div>
+                    <audio src={mediaPreview} controls className="flex-1" />
+                  </div>
                 ) : (
                   <img src={mediaPreview} alt="Preview" className="w-full max-h-[300px] object-cover" />
                 )}
                 <button
                   onClick={removeMedia}
-                  className="absolute top-2 right-2 bg-black/50 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                  className="absolute top-2 right-2 bg-black/50 text-white p-1 rounded-full hover:bg-black/70 transition-colors"
                 >
                   <X size={16} />
                 </button>
+              </div>
+            )}
+
+            {showEmojiPicker && (
+              <div className="absolute top-full left-0 z-50 shadow-xl rounded-xl">
+                <EmojiPicker
+                  onEmojiClick={(emojiData) => {
+                    setContent(prev => prev + emojiData.emoji);
+                    setShowEmojiPicker(false);
+                  }}
+                  width={320}
+                  height={400}
+                  lazyLoadEmojis={true}
+                />
+                <div
+                  className="fixed inset-0 z-[-1]"
+                  onClick={() => setShowEmojiPicker(false)}
+                />
               </div>
             )}
           </div>
@@ -132,6 +214,13 @@ const CreateModal: React.FC<CreateModalProps> = ({ onClose }) => {
           ref={fileInputRef}
           onChange={handleMediaSelect}
           accept="image/*,video/*"
+          className="hidden"
+        />
+        <input
+          type="file"
+          ref={audioInputRef}
+          onChange={handleMediaSelect}
+          accept="audio/*"
           className="hidden"
         />
 
@@ -147,9 +236,37 @@ const CreateModal: React.FC<CreateModalProps> = ({ onClose }) => {
             >
               <Image size={22} />
             </button>
-            <button className="hover:bg-red-50 dark:hover:bg-red-900/20 p-2 rounded-full transition-colors"><Music size={22} /></button>
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="hover:bg-red-50 dark:hover:bg-red-900/20 p-2 rounded-full transition-colors"
+              title="Add Video"
+            >
+              <Video size={22} />
+            </button>
+            <button
+              onClick={() => {
+                setIsPollMode(!isPollMode);
+                if (!isPollMode) removeMedia();
+              }}
+              className={`hover:bg-red-50 dark:hover:bg-red-900/20 p-2 rounded-full transition-colors ${isPollMode ? 'text-red-500 bg-red-50 dark:bg-red-900/20' : ''}`}
+            >
+              <BarChart2 size={22} />
+            </button>
+
+            <button
+              onClick={() => audioInputRef.current?.click()}
+              className="hover:bg-red-50 dark:hover:bg-red-900/20 p-2 rounded-full transition-colors"
+              title="Add Audio/Music"
+            >
+              <Music size={22} />
+            </button>
             <button className="hover:bg-red-50 dark:hover:bg-red-900/20 p-2 rounded-full transition-colors"><MapPin size={22} /></button>
-            <button className="hover:bg-red-50 dark:hover:bg-red-900/20 p-2 rounded-full transition-colors"><Smile size={22} /></button>
+            <button
+              onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+              className={`hover:bg-red-50 dark:hover:bg-red-900/20 p-2 rounded-full transition-colors ${showEmojiPicker ? 'text-[#ff1744] bg-red-50' : ''}`}
+            >
+              <Smile size={22} />
+            </button>
           </div>
           <div className="text-xs text-gray-400 font-medium">
             {content.length}/280

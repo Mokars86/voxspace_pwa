@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { PenLine, Image as ImageIcon, Loader2, X } from 'lucide-react';
+import { PenLine, Image as ImageIcon, Video, Loader2, X, BarChart2, Plus, Minus } from 'lucide-react';
 import PostCard from './PostCard';
 import StoryBar from './StoryBar';
 import ImageViewer from './ImageViewer';
@@ -18,10 +18,11 @@ const FeedView: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [newPostContent, setNewPostContent] = useState('');
   const [isPosting, setIsPosting] = useState(false);
-  // Media Upload State
   const [selectedMedia, setSelectedMedia] = useState<{ file: File, type: 'image' | 'video' } | null>(null);
   const [mediaPreview, setMediaPreview] = useState<string | null>(null);
-  const [viewingImage, setViewingImage] = useState<string | null>(null);
+  const [viewingImage, setViewingImage] = useState<{ url: string, type: 'image' | 'video' } | null>(null);
+  const [isPollMode, setIsPollMode] = useState(false);
+  const [pollOptions, setPollOptions] = useState<string[]>(['', '']);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const fetchPosts = async () => {
@@ -35,7 +36,13 @@ const FeedView: React.FC = () => {
             media_url,
             media_type,
             location,
+            id,
+            content,
+            media_url,
+            media_type,
+            location,
             created_at,
+            poll_options,
             likes_count,
             comments_count,
             reposts_count,
@@ -49,7 +56,8 @@ const FeedView: React.FC = () => {
                 is_verified,
                 badge_type
             ),
-            post_likes(user_id)
+            post_likes(user_id),
+            poll_votes(option_index)
         `)
         .is('space_id', null) // Filter out space posts
         .order('created_at', { ascending: false });
@@ -118,7 +126,9 @@ const FeedView: React.FC = () => {
         media_type: item.media_type,
         location: item.location,
         isLiked: user ? item.post_likes?.some((l: any) => l.user_id === user.id) : false,
-        is_pinned: item.is_pinned
+        is_pinned: item.is_pinned,
+        poll_options: item.poll_options,
+        user_vote: user && item.poll_votes?.length > 0 ? item.poll_votes[0].option_index : null
       }));
 
       setPosts(formattedPosts);
@@ -147,7 +157,11 @@ const FeedView: React.FC = () => {
   };
 
   const handleCreatePost = async () => {
-    if ((!newPostContent.trim() && !selectedMedia) || !user) return;
+    if ((!newPostContent.trim() && !selectedMedia && !isPollMode) || !user) return;
+    if (isPollMode && pollOptions.filter(o => o.trim()).length < 2) {
+      alert("Please add at least 2 poll options.");
+      return;
+    }
     setIsPosting(true);
 
     // Optimistic Post
@@ -168,13 +182,16 @@ const FeedView: React.FC = () => {
       reposts: 0,
       media: mediaPreview ? mediaPreview : undefined,
       media_type: selectedMedia?.type || undefined,
+      poll_options: isPollMode ? pollOptions.filter(o => o.trim()).map(text => ({ text, count: 0 })) : undefined,
       location: null,
       isLiked: false
     };
 
     setPosts(prev => [optimisticPost, ...prev]);
     setNewPostContent('');
-    removeMedia(); // Clear UI immediately
+    removeMedia();
+    setIsPollMode(false);
+    setPollOptions(['', '']);
 
     try {
       let mediaUrl = null;
@@ -201,7 +218,8 @@ const FeedView: React.FC = () => {
         user_id: user.id,
         content: optimisticPost.content,
         media_url: mediaUrl,
-        media_type: selectedMedia?.type
+        media_type: selectedMedia?.type,
+        poll_options: optimisticPost.poll_options
       }).select().single();
 
       if (error) throw error;
@@ -209,7 +227,6 @@ const FeedView: React.FC = () => {
     } catch (error) {
       console.error("Error creating post:", error);
       alert("Failed to post. Please try again.");
-      // Rollback
       setPosts(prev => prev.filter(p => p.id !== tempId));
     } finally {
       setIsPosting(false);
@@ -255,7 +272,10 @@ const FeedView: React.FC = () => {
                     media_url,
                     media_type,
                     location,
+                    media_type,
+                    location,
                     created_at,
+                    poll_options,
                     likes_count,
                     comments_count,
                     reposts_count,
@@ -293,7 +313,8 @@ const FeedView: React.FC = () => {
               media_type: data.media_type,
               location: data.location,
               isLiked: user ? data.post_likes?.some((l: any) => l.user_id === user.id) : false,
-              is_pinned: data.is_pinned
+              is_pinned: data.is_pinned,
+              poll_options: data.poll_options
             };
 
             setPosts(prev => {
@@ -311,7 +332,8 @@ const FeedView: React.FC = () => {
             content: payload.new.content,
             is_pinned: payload.new.is_pinned,
             likes: payload.new.likes_count,
-            comments: payload.new.comments_count
+            comments: payload.new.comments_count,
+            poll_options: payload.new.poll_options
           } : p));
         }
       )
@@ -442,13 +464,69 @@ const FeedView: React.FC = () => {
             <div className="flex items-center gap-4 mt-2 text-[#ff1744]">
               <button
                 onClick={() => fileInputRef.current?.click()}
-                className="hover:bg-red-50 dark:hover:bg-red-900/20 p-1 rounded-full transition-colors"
+                className="hover:bg-red-50 dark:hover:bg-red-900/20 p-2 rounded-full transition-colors flex items-center gap-2"
                 title="Add Image or Video"
               >
                 <ImageIcon size={20} />
               </button>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="hover:bg-red-50 dark:hover:bg-red-900/20 p-2 rounded-full transition-colors flex items-center gap-2"
+                title="Add Video"
+              >
+                <Video size={20} />
+              </button>
+              <button
+                onClick={() => {
+                  setIsPollMode(!isPollMode);
+                  if (!isPollMode) {
+                    removeMedia(); // Polls usually exclusive with media in this design
+                  }
+                }}
+                className={`hover:bg-red-50 dark:hover:bg-red-900/20 p-2 rounded-full transition-colors flex items-center gap-2 ${isPollMode ? 'bg-red-50 dark:bg-red-900/20' : ''}`}
+                title="Create Poll"
+              >
+                <BarChart2 size={20} />
+              </button>
 
             </div>
+
+            {isPollMode && (
+              <div className="mt-3 space-y-2 animate-in fade-in slide-in-from-top-2">
+                {pollOptions.map((option, idx) => (
+                  <div key={idx} className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder={`Option ${idx + 1}`}
+                      value={option}
+                      onChange={(e) => {
+                        const newOptions = [...pollOptions];
+                        newOptions[idx] = e.target.value;
+                        setPollOptions(newOptions);
+                      }}
+                      className="flex-1 bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-[#ff1744] transition-colors"
+                    />
+                    {pollOptions.length > 2 && (
+                      <button
+                        onClick={() => setPollOptions(pollOptions.filter((_, i) => i !== idx))}
+                        className="text-gray-400 hover:text-red-500 p-2"
+                      >
+                        <X size={16} />
+                      </button>
+                    )}
+                  </div>
+                ))}
+                {pollOptions.length < 4 && (
+                  <button
+                    onClick={() => setPollOptions([...pollOptions, ''])}
+                    className="text-[#ff1744] text-sm font-medium hover:underline flex items-center gap-1"
+                  >
+                    <Plus size={14} /> Add Option
+                  </button>
+                )}
+              </div>
+            )}
+
             <input
               type="file"
               ref={fileInputRef}
@@ -474,7 +552,7 @@ const FeedView: React.FC = () => {
                 post={post}
                 onDelete={handleDeletePost}
                 onPin={(id) => handlePinPost(id, post.is_pinned || false)}
-                onMediaClick={(url) => setViewingImage(url)}
+                onMediaClick={(url, type) => setViewingImage({ url, type: type as 'image' | 'video' || 'image' })}
               />
             ))
           ) : (
@@ -494,7 +572,8 @@ const FeedView: React.FC = () => {
       <ImageViewer
         isOpen={!!viewingImage}
         onClose={() => setViewingImage(null)}
-        src={viewingImage || ''}
+        src={viewingImage?.url || ''}
+        type={viewingImage?.type || 'image'}
       />
     </div>
   );
