@@ -72,10 +72,12 @@
     @apply antialiased text-foreground bg-background;
     font-feature-settings: "rlig" 1, "calt" 1;
   }
-  html.dark body {
-    background-color: hsl(var(--background));
-    color: hsl(var(--foreground));
-  }
+}
+}
+
+html.dark body {
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
 }
 
 @layer utilities {
