@@ -567,7 +567,29 @@ const MessageBubble: React.FC<MessageProps> = ({ message, onSwipeReply, onReact,
                             </div>
                         ) : (
                             <p className="text-[15px] leading-relaxed break-words whitespace-pre-wrap">
-                                {message.text}
+                                {(() => {
+                                    const urlRegex = /(https?:\/\/[^\s]+)/g;
+                                    return message.text.split(urlRegex).map((part, i) => {
+                                        if (part.match(urlRegex)) {
+                                            return (
+                                                <a
+                                                    key={i}
+                                                    href={part}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className={cn(
+                                                        "underline hover:opacity-80 break-all font-medium",
+                                                        isMe ? "text-white" : "text-blue-600 dark:text-blue-400"
+                                                    )}
+                                                    onClick={(e) => e.stopPropagation()}
+                                                >
+                                                    {part}
+                                                </a>
+                                            );
+                                        }
+                                        return part;
+                                    });
+                                })()}
                                 {message.isEdited && <span className="text-[10px] opacity-60 ml-1">(edited)</span>}
                             </p>
                         )
