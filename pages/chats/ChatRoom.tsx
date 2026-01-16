@@ -74,7 +74,7 @@ const ChatRoom = () => {
     const { user } = useAuth();
     const navigate = useNavigate();
     const { chatWallpaper } = useTheme();
-    const { sentMessageSound } = useNotifications();
+    const { sentMessageSound, markChatNotificationsAsRead, setActiveChatId } = useNotifications();
 
     // State
     const [messages, setMessages] = useState<Message[]>([]);
@@ -317,6 +317,9 @@ const ChatRoom = () => {
                 .eq('chat_id', chatId)
                 .eq('user_id', user.id);
 
+            // 3. Sync Notification System (Clear Badge)
+            await markChatNotificationsAsRead(chatId);
+
         } catch (e) {
             console.error("Error marking messages as read", e);
         }
@@ -497,6 +500,13 @@ const ChatRoom = () => {
         // Auto-scroll on initial load or new messages if near bottom
         scrollToBottom();
     }, [messages.length, loading]);
+
+    useEffect(() => {
+        if (chatId) {
+            setActiveChatId(chatId);
+            return () => setActiveChatId(null);
+        }
+    }, [chatId]);
 
 
     // Handlers

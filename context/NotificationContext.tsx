@@ -18,6 +18,7 @@ interface NotificationContextType {
     unreadCount: number;
     markAsRead: (id: string) => Promise<void>;
     markAllAsRead: () => Promise<void>;
+    markChatNotificationsAsRead: (chatId: string) => Promise<void>;
     loading: boolean;
     sentMessageSound: string;
     setSentMessageSound: (sound: string) => void;
@@ -26,6 +27,8 @@ interface NotificationContextType {
     setFcmToken: (token: string | null) => void;
     permissionStatus: string;
     setPermissionStatus: (status: string) => void;
+    activeChatId: string | null;
+    setActiveChatId: (id: string | null) => void;
 }
 
 const NotificationContext = createContext<NotificationContextType>({
@@ -33,13 +36,15 @@ const NotificationContext = createContext<NotificationContextType>({
     unreadCount: 0,
     markAsRead: async () => { },
     markAllAsRead: async () => { },
+    markChatNotificationsAsRead: async () => { },
     loading: true,
     sentMessageSound: 'pop',
     setSentMessageSound: () => { },
     fcmToken: null,
     setFcmToken: () => { },
     permissionStatus: 'unknown',
-    setPermissionStatus: () => { },
+    activeChatId: null,
+    setActiveChatId: () => { },
 });
 
 export const NotificationProvider = ({ children }: { children: React.ReactNode }) => {
@@ -51,6 +56,7 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
     });
     const [fcmToken, setFcmToken] = useState<string | null>(null);
     const [permissionStatus, setPermissionStatus] = useState<string>('unknown');
+    const [activeChatId, setActiveChatId] = useState<string | null>(null);
 
     useEffect(() => {
         localStorage.setItem('sentMessageSound', sentMessageSound);
@@ -96,10 +102,42 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
                 },
                 (payload) => {
                     const newNotif = payload.new as Notification;
+
+                    // Auto-read if in active chat
+                    let shouldMarkRead = false;
+                    if (activeChatId && newNotif.data?.chat_id === activeChatId) {
+                        newNotif.is_read = true;
+                        shouldMarkRead = true;
+                    }
+
                     setNotifications((prev) => [newNotif, ...prev]);
 
-                    // Optional: Play a sound or vibrate here
-                    if (navigator.vibrate) navigator.vibrate(200);
+                    if (shouldMarkRead) {
+                        // Background sync to DB
+                        supabase
+                            .from('notifications')
+                            .update({ is_read: true })
+                            .eq('id', newNotif.id)
+                            .then(({ error }) => {
+                                if (error) console.error("Auto-read sync failed", error);
+                            });
+                    } else {
+                        // Only vibrate/sound if NOT reading it right now
+                        if (navigator.vibrate) navigator.vibrate(200);
+                    }
+                }
+            )
+            .on(
+                'postgres_changes',
+                {
+                    event: 'UPDATE',
+                    schema: 'public',
+                    table: 'notifications',
+                    filter: `user_id=eq.${user.id}`,
+                },
+                (payload) => {
+                    const updatedNotif = payload.new as Notification;
+                    setNotifications(prev => prev.map(n => n.id === updatedNotif.id ? updatedNotif : n));
                 }
             )
             .subscribe();
@@ -107,7 +145,7 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
         return () => {
             supabase.removeChannel(channel);
         };
-    }, [user]);
+    }, [user, activeChatId]); // Re-subscribe when activeChatId changes to capture correct closure value
 
     const unreadCount = notifications.filter(n => !n.is_read).length;
 
@@ -134,19 +172,47 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
         }
     };
 
+    const markChatNotificationsAsRead = async (chatId: string) => {
+        // 1. Identify IDs to mark as read from local state
+        const idsToMark = notifications
+            .filter(n => !n.is_read && n.data?.chat_id === chatId)
+            .map(n => n.id);
+
+        if (idsToMark.length === 0) return; // Nothing to do
+
+        // 2. Optimistic Update
+        setNotifications(prev => prev.map(n => {
+            if (idsToMark.includes(n.id)) {
+                return { ...n, is_read: true };
+            }
+            return n;
+        }));
+
+        // 3. Explicit DB Update by IDs
+        if (user) {
+            await supabase
+                .from('notifications')
+                .update({ is_read: true })
+                .in('id', idsToMark);
+        }
+    };
+
     return (
         <NotificationContext.Provider value={{
             notifications,
             unreadCount,
             markAsRead,
             markAllAsRead,
+            markChatNotificationsAsRead,
             loading,
             sentMessageSound,
             setSentMessageSound,
             fcmToken,
             setFcmToken,
             permissionStatus,
-            setPermissionStatus
+            setPermissionStatus,
+            activeChatId,
+            setActiveChatId
         }}>
             {children}
         </NotificationContext.Provider>
