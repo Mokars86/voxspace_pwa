@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import QRCode from 'react-qr-code';
-import { QrReader } from 'react-qr-reader';
+import { Scanner } from '@yudiel/react-qr-scanner';
 import { X, Copy, Check, Info } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../services/supabase';
@@ -29,9 +29,11 @@ const QRCodeModal: React.FC<QRCodeModalProps> = ({ isOpen, onClose }) => {
         setTimeout(() => setCopied(false), 2000);
     };
 
-    const handleScan = async (result: any, error: any) => {
+    const handleScan = async (result: any) => {
         if (result && !scannedData) {
-            const data = result?.text;
+            // @yudiel/react-qr-scanner returns array of results
+            const data = result[0]?.rawValue;
+
             if (data && data.startsWith('voxspace:user:')) {
                 setScannedData(data); // stop scanning essentially
                 const targetUserId = data.split(':')[2];
@@ -124,12 +126,12 @@ const QRCodeModal: React.FC<QRCodeModalProps> = ({ isOpen, onClose }) => {
                                 </div>
                             </div>
 
-                            <QrReader
-                                onResult={handleScan}
-                                constraints={{ facingMode: 'environment' }}
-                                className="w-full h-full object-cover"
-                                ViewFinder={() => null}
-                            />
+                            <div className="w-full h-full object-cover [&>video]:object-cover">
+                                <Scanner
+                                    onScan={handleScan}
+                                    formats={['qr_code']}
+                                />
+                            </div>
 
                             {scanError && (
                                 <div className="absolute bottom-8 z-20 bg-red-500 text-white px-4 py-2 rounded-full text-sm font-bold flex items-center gap-2 shadow-lg animate-in slide-in-from-bottom">
