@@ -7,7 +7,7 @@ import PostCard from '../components/PostCard';
 import { Post } from '../types';
 import ImageViewer from '../components/ImageViewer';
 import { BadgeIcon } from '../components/BadgeIcon';
-import { BadgeType } from '../src/constants/badges';
+import { BadgeType } from '../constants/badges';
 
 interface ProfileData {
     id: string;

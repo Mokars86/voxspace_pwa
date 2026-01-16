@@ -9,7 +9,7 @@ import RepostModal from './RepostModal';
 import { db } from '../services/db';
 import { MyBagItem } from '../types/mybag';
 import { BadgeIcon } from './BadgeIcon';
-import { BadgeType } from '../src/constants/badges';
+import { BadgeType } from '../constants/badges';
 
 interface PostCardProps {
     post: Post;

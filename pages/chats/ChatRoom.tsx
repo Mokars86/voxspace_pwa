@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 import { useNotifications } from '../../context/NotificationContext';
 import { BadgeIcon } from '../../components/BadgeIcon';
-import { BadgeType } from '../../src/constants/badges';
+import { BadgeType } from '../../constants/badges';
 
 interface Message extends ChatMessage {
     // Extended properties if needed, currently matching ChatMessage

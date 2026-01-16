@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Zap } from 'lucide-react';
-import { BadgeType, getBadgeColor } from '../src/constants/badges';
+import { BadgeType, getBadgeColor } from '../constants/badges';
 
 interface BadgeIconProps {
     type: BadgeType | string;

@@ -9,7 +9,7 @@ import { useNavigate, Link as RouterLink } from 'react-router-dom';
 import ImageViewer from './ImageViewer';
 import QRCodeModal from './QRCodeModal';
 import { BadgeIcon } from './BadgeIcon';
-import { BadgeType } from '../src/constants/badges';
+import { BadgeType } from '../constants/badges';
 
 interface ProfileData {
   full_name: string;

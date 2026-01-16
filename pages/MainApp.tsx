@@ -22,6 +22,8 @@ import { useNotifications } from '../context/NotificationContext';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabase';
 
+import { PWAInstallPrompt } from '../components/PWAInstallPrompt';
+
 const MainApp: React.FC = () => {
     const { t } = useLanguage();
     const { unreadCount: globalUnreadCount, notifications, markAsRead, markAllAsRead } = useNotifications();
@@ -216,7 +218,8 @@ const MainApp: React.FC = () => {
                 <Plus size={30} strokeWidth={3} />
             </button>
 
-            {/* Modals & Overlays */}
+            {/* Modals and Overlays */}
+            <PWAInstallPrompt />
             {showCreateModal && <CreateModal onClose={() => setShowCreateModal(false)} />}
             {showNotifications && (
                 <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex justify-end md:justify-center md:items-center">

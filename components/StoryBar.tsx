@@ -6,7 +6,7 @@ import { Story } from '../types';
 import StoryViewer from './StoryViewer';
 import CreateStoryModal from './CreateStoryModal';
 import { BadgeIcon } from './BadgeIcon';
-import { BadgeType } from '../src/constants/badges';
+import { BadgeType } from '../constants/badges';
 
 const StoryBar: React.FC = () => {
     const { user, profile } = useAuth(); // Use profile for my badge
