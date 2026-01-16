@@ -22,3 +22,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Secrets
+android/app/voxspace-87dee-firebase-adminsdk-fbsvc-227f333bd4.json

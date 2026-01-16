@@ -59,11 +59,7 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
-import { LanguageProvider } from './context/LanguageContext';
-import { NotificationProvider } from './context/NotificationContext';
 import { usePushNotifications } from './hooks/usePushNotifications';
-
-import ErrorBoundary from './components/ErrorBoundary';
 
 const App: React.FC = () => {
   usePushNotifications();
@@ -93,41 +89,33 @@ const App: React.FC = () => {
   }, []);
 
   return (
-    <ErrorBoundary>
-      <LanguageProvider>
-        <NotificationProvider>
-          <CallProvider>
-            <Routes>
-              <Route path="/my-bag" element={<ProtectedRoute><MyBag /></ProtectedRoute>} />
-              <Route path="/welcome" element={<Welcome />} />
-              <Route path="/login" element={<Login />} />
+    <Routes>
+      <Route path="/my-bag" element={<ProtectedRoute><MyBag /></ProtectedRoute>} />
+      <Route path="/welcome" element={<Welcome />} />
+      <Route path="/login" element={<Login />} />
 
-              <Route
-                path="/chat/:id"
-                element={
-                  <ProtectedRoute>
-                    <ChatRoom />
-                  </ProtectedRoute>
-                }
-              />
-              {/* ... other routes ... */}
-              <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
-              <Route path="/settings/notifications" element={<ProtectedRoute><NotificationSettings /></ProtectedRoute>} />
-              <Route path="/settings/privacy" element={<ProtectedRoute><PrivacySettings /></ProtectedRoute>} />
-              <Route path="/settings/privacy/blocked" element={<ProtectedRoute><BlockedUsers /></ProtectedRoute>} />
-              <Route path="/settings/security" element={<ProtectedRoute><SecuritySettings /></ProtectedRoute>} />
-              <Route path="/settings/data" element={<ProtectedRoute><DataSettings /></ProtectedRoute>} />
-              <Route path="/settings/appearance" element={<ProtectedRoute><AppearanceSettings /></ProtectedRoute>} />
-              <Route path="/edit-profile" element={<ProtectedRoute><EditProfile /></ProtectedRoute>} />
-              <Route path="/space/:id" element={<ProtectedRoute><SpaceDetail /></ProtectedRoute>} />
-              <Route path="/space/:id/chat" element={<ProtectedRoute><SpaceChatRoom /></ProtectedRoute>} />
-              <Route path="/user/:id" element={<ProtectedRoute><UserProfile /></ProtectedRoute>} />
-              <Route path="/*" element={<ProtectedRoute><MainApp /></ProtectedRoute>} />
-            </Routes>
-          </CallProvider>
-        </NotificationProvider>
-      </LanguageProvider>
-    </ErrorBoundary>
+      <Route
+        path="/chat/:id"
+        element={
+          <ProtectedRoute>
+            <ChatRoom />
+          </ProtectedRoute>
+        }
+      />
+      {/* ... other routes ... */}
+      <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+      <Route path="/settings/notifications" element={<ProtectedRoute><NotificationSettings /></ProtectedRoute>} />
+      <Route path="/settings/privacy" element={<ProtectedRoute><PrivacySettings /></ProtectedRoute>} />
+      <Route path="/settings/privacy/blocked" element={<ProtectedRoute><BlockedUsers /></ProtectedRoute>} />
+      <Route path="/settings/security" element={<ProtectedRoute><SecuritySettings /></ProtectedRoute>} />
+      <Route path="/settings/data" element={<ProtectedRoute><DataSettings /></ProtectedRoute>} />
+      <Route path="/settings/appearance" element={<ProtectedRoute><AppearanceSettings /></ProtectedRoute>} />
+      <Route path="/edit-profile" element={<ProtectedRoute><EditProfile /></ProtectedRoute>} />
+      <Route path="/space/:id" element={<ProtectedRoute><SpaceDetail /></ProtectedRoute>} />
+      <Route path="/space/:id/chat" element={<ProtectedRoute><SpaceChatRoom /></ProtectedRoute>} />
+      <Route path="/user/:id" element={<ProtectedRoute><UserProfile /></ProtectedRoute>} />
+      <Route path="/*" element={<ProtectedRoute><MainApp /></ProtectedRoute>} />
+    </Routes>
   );
 };
 

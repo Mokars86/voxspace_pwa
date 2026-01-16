@@ -17,14 +17,17 @@ create table if not exists public.blocked_users (
 -- RLS for blocked_users
 alter table public.blocked_users enable row level security;
 
+drop policy if exists "Users can view who they blocked" on public.blocked_users;
 create policy "Users can view who they blocked"
 on public.blocked_users for select
 using (auth.uid() = blocker_id);
 
+drop policy if exists "Users can block others" on public.blocked_users;
 create policy "Users can block others"
 on public.blocked_users for insert
 with check (auth.uid() = blocker_id);
 
+drop policy if exists "Users can unblock others" on public.blocked_users;
 create policy "Users can unblock others"
 on public.blocked_users for delete
 using (auth.uid() = blocker_id);

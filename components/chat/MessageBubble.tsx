@@ -1,6 +1,6 @@
 import React from 'react';
 import { cn } from '../../lib/utils';
-import { Check, CheckCheck, Play, Pause, File as FileIcon, MapPin, Music, Timer, EyeOff, Lock, Video, Reply, ShoppingBag } from 'lucide-react';
+import { Check, CheckCheck, Play, Pause, File as FileIcon, MapPin, Music, Timer, EyeOff, Lock, Video, Reply, ShoppingBag, Download } from 'lucide-react';
 
 export interface ChatMessage {
     id: string;
@@ -154,6 +154,18 @@ const AudioPlayer = ({ url, isMe, duration: initialDuration, type }: { url: stri
                 onError={() => { }} // Silent fail
                 className="hidden"
             />
+
+            <a
+                href={url}
+                download={`audio_${Date.now()}.mp3`}
+                onClick={(e) => e.stopPropagation()}
+                className={cn(
+                    "p-2 rounded-full transition-colors",
+                    isMe ? "text-white/80 hover:bg-white/20" : "text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"
+                )}
+            >
+                <Download size={18} />
+            </a>
         </div>
     );
 };

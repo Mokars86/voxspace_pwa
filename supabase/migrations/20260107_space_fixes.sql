@@ -4,6 +4,7 @@ VALUES ('space-media', 'space-media', true)
 ON CONFLICT (id) DO NOTHING;
 
 -- RLS for space-media
+drop policy if exists "Authenticated users can upload space media" on storage.objects;
 CREATE POLICY "Authenticated users can upload space media"
 ON storage.objects FOR INSERT
 WITH CHECK (
@@ -11,6 +12,7 @@ WITH CHECK (
   AND auth.role() = 'authenticated'
 );
 
+drop policy if exists "Anyone can view space media" on storage.objects;
 CREATE POLICY "Anyone can view space media"
 ON storage.objects FOR SELECT
 USING ( bucket_id = 'space-media' );

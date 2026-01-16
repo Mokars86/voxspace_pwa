@@ -104,7 +104,82 @@ const NotificationSettings: React.FC = () => {
                     <h3 className="font-bold text-gray-900 dark:text-gray-100 mb-2">Message Sounds</h3>
                     <SoundSelector />
                 </div>
+
+                {/* Debug / Diagnostics */}
+                {process.env.NODE_ENV === 'development' || true ? ( // Always show for now to debug
+                    <div className="bg-gray-50 dark:bg-gray-950 p-4 rounded-2xl space-y-4 border border-blue-100 dark:border-blue-900">
+                        <h3 className="font-bold text-blue-600 dark:text-blue-400 mb-2 flex items-center gap-2">
+                            <Loader2 size={16} /> Debug Diagnostics
+                        </h3>
+                        <DebugSection />
+                    </div>
+                ) : null}
             </div>
+        </div>
+    );
+};
+
+const DebugSection = () => {
+    const { fcmToken, permissionStatus } = useNotifications();
+    const { user } = useAuth();
+    const [sending, setSending] = useState(false);
+    const [result, setResult] = useState<string>('');
+
+    const sendTest = async () => {
+        if (!user || !fcmToken) return;
+        setSending(true);
+        setResult('Sending...');
+        try {
+            const { data, error } = await supabase.functions.invoke('push-notification', {
+                body: {
+                    type: 'test',
+                    record: {
+                        user_id: user.id, // For test logic
+                        content: 'This is a test notification'
+                    }
+                }
+            });
+
+            if (error) throw error;
+            setResult('Success: ' + JSON.stringify(data));
+        } catch (e: any) {
+            setResult('Error: ' + e.message);
+        } finally {
+            setSending(false);
+        }
+    };
+
+    return (
+        <div className="space-y-3 text-sm">
+            <div className="flex justify-between">
+                <span className="text-gray-500">Permission:</span>
+                <span className={`font-mono ${permissionStatus === 'granted' ? 'text-green-600' : 'text-red-500'}`}>
+                    {permissionStatus}
+                </span>
+            </div>
+            <div className="flex justify-between items-center">
+                <span className="text-gray-500">FCM Token:</span>
+                <span className={`font-mono text-xs truncate max-w-[150px] ${fcmToken ? 'text-green-600' : 'text-orange-500'}`}>
+                    {fcmToken ? 'Present' : 'Missing'}
+                </span>
+            </div>
+            {fcmToken && (
+                <div className="pt-2">
+                    <button
+                        onClick={sendTest}
+                        disabled={sending}
+                        className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center justify-center gap-2"
+                    >
+                        {sending ? <Loader2 className="animate-spin" size={16} /> : <Bell size={16} />}
+                        Send Test Notification
+                    </button>
+                    {result && (
+                        <div className="mt-2 p-2 bg-gray-100 dark:bg-gray-900 rounded text-xs break-all font-mono">
+                            {result}
+                        </div>
+                    )}
+                </div>
+            )}
         </div>
     );
 };

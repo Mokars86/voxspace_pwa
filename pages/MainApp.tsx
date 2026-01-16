@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     MessageCircle,
     Rss,
@@ -20,14 +20,67 @@ import CreateModal from '../components/CreateModal';
 import { useLanguage } from '../context/LanguageContext';
 import { useNotifications } from '../context/NotificationContext';
 import { useNavigate } from 'react-router-dom';
+import { supabase } from '../services/supabase';
 
 const MainApp: React.FC = () => {
     const { t } = useLanguage();
-    const { unreadCount, notifications, markAsRead, markAllAsRead } = useNotifications();
+    const { unreadCount: globalUnreadCount, notifications, markAsRead, markAllAsRead } = useNotifications();
     const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState<TabType>('feed');
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [showNotifications, setShowNotifications] = useState(false);
+
+    // -- Badge State --
+    const [newPostCount, setNewPostCount] = useState(0);
+    const [lastViewedFeed, setLastViewedFeed] = useState(() => localStorage.getItem('lastViewedFeed') || new Date().toISOString());
+
+    // 1. Calculate Badge Counts
+    const chatBadgeCount = notifications.filter(n => n.type === 'message' && !n.is_read).length;
+    // Note: globalUnreadCount might be more accurate if context sums up unread messages from logic
+    // For now using context notifications filter as base, or we can use globalUnreadCount if it represents messages.
+    // Actually globalUnreadCount in context is just filter(!is_read).length. 
+    // But we want to separate "Chat Messages" from "Feed/System" notifications.
+
+    // Feed Badges: Comments + Likes + Follows + New Posts
+    const feedNotificationCount = notifications.filter(n =>
+        (n.type === 'like' || n.type === 'comment' || n.type === 'follow') && !n.is_read
+    ).length;
+
+    const feedBadgeCount = feedNotificationCount + newPostCount;
+
+    // 2. Fetch New Posts Logic
+    useEffect(() => {
+        const checkNewPosts = async () => {
+            // Count posts created AFTER lastViewedFeed
+            // Limit check to last 24h to avoid massive queries on old accounts
+            const { count, error } = await supabase
+                .from('posts')
+                .select('*', { count: 'exact', head: true })
+                .gt('created_at', lastViewedFeed);
+
+            if (!error && count) {
+                setNewPostCount(count);
+            }
+        };
+
+        checkNewPosts();
+
+        // Optional: Interval to check periodically? Or rely on realtime if we added it for feed
+        const interval = setInterval(checkNewPosts, 60000); // Check every minute
+        return () => clearInterval(interval);
+    }, [lastViewedFeed]);
+
+    // 3. Handle Tab Change (Clear Badges)
+    const handleTabChange = (tab: TabType) => {
+        setActiveTab(tab);
+        if (tab === 'feed') {
+            const now = new Date().toISOString();
+            setLastViewedFeed(now);
+            localStorage.setItem('lastViewedFeed', now);
+            setNewPostCount(0);
+        }
+    };
+
 
     const renderContent = () => {
         switch (activeTab) {
@@ -55,11 +108,23 @@ const MainApp: React.FC = () => {
                 </div>
 
                 <div className="flex-1 px-4 space-y-2 mt-4">
-                    <NavButtonDesktop active={activeTab === 'feed'} onClick={() => setActiveTab('feed')} icon={<Rss size={24} />} label={t('nav.feed')} />
-                    <NavButtonDesktop active={activeTab === 'chats'} onClick={() => setActiveTab('chats')} icon={<MessageCircle size={24} />} label={t('nav.chats')} />
-                    <NavButtonDesktop active={activeTab === 'spaces'} onClick={() => setActiveTab('spaces')} icon={<Users size={24} />} label={t('nav.spaces')} />
-                    <NavButtonDesktop active={activeTab === 'discover'} onClick={() => setActiveTab('discover')} icon={<Search size={24} />} label={t('nav.discover')} />
-                    <NavButtonDesktop active={activeTab === 'profile'} onClick={() => setActiveTab('profile')} icon={<User size={24} />} label={t('nav.profile')} />
+                    <NavButtonDesktop
+                        active={activeTab === 'feed'}
+                        onClick={() => handleTabChange('feed')}
+                        icon={<Rss size={24} />}
+                        label={t('nav.feed')}
+                        badge={feedBadgeCount}
+                    />
+                    <NavButtonDesktop
+                        active={activeTab === 'chats'}
+                        onClick={() => handleTabChange('chats')}
+                        icon={<MessageCircle size={24} />}
+                        label={t('nav.chats')}
+                        badge={chatBadgeCount}
+                    />
+                    <NavButtonDesktop active={activeTab === 'spaces'} onClick={() => handleTabChange('spaces')} icon={<Users size={24} />} label={t('nav.spaces')} />
+                    <NavButtonDesktop active={activeTab === 'discover'} onClick={() => handleTabChange('discover')} icon={<Search size={24} />} label={t('nav.discover')} />
+                    <NavButtonDesktop active={activeTab === 'profile'} onClick={() => handleTabChange('profile')} icon={<User size={24} />} label={t('nav.profile')} />
                 </div>
 
 
@@ -84,7 +149,7 @@ const MainApp: React.FC = () => {
                             className="p-1.5 rounded-full text-gray-600 dark:text-gray-400 relative"
                         >
                             <Bell size={22} />
-                            {unreadCount > 0 && (
+                            {globalUnreadCount > 0 && (
                                 <span className="absolute top-1 right-1 w-2 h-2 bg-[#ff1744] rounded-full animate-pulse"></span>
                             )}
                         </button>
@@ -98,11 +163,23 @@ const MainApp: React.FC = () => {
 
                 {/* Mobile Bottom Nav */}
                 <nav className="md:hidden flex items-center justify-around py-3 border-t border-gray-100 dark:border-gray-800 bg-white/90 dark:bg-gray-900/90 backdrop-blur-md safe-bottom sticky bottom-0 z-10 w-full">
-                    <NavButton active={activeTab === 'chats'} onClick={() => setActiveTab('chats')} icon={<MessageCircle size={24} />} label={t('nav.chats')} />
-                    <NavButton active={activeTab === 'feed'} onClick={() => setActiveTab('feed')} icon={<Rss size={24} />} label={t('nav.feed')} />
-                    <NavButton active={activeTab === 'spaces'} onClick={() => setActiveTab('spaces')} icon={<Users size={24} />} label={t('nav.spaces')} />
-                    <NavButton active={activeTab === 'discover'} onClick={() => setActiveTab('discover')} icon={<Search size={24} />} label={t('nav.discover')} />
-                    <NavButton active={activeTab === 'profile'} onClick={() => setActiveTab('profile')} icon={<User size={24} />} label={t('nav.profile')} />
+                    <NavButton
+                        active={activeTab === 'chats'}
+                        onClick={() => handleTabChange('chats')}
+                        icon={<MessageCircle size={24} />}
+                        label={t('nav.chats')}
+                        badge={chatBadgeCount}
+                    />
+                    <NavButton
+                        active={activeTab === 'feed'}
+                        onClick={() => handleTabChange('feed')}
+                        icon={<Rss size={24} />}
+                        label={t('nav.feed')}
+                        badge={feedBadgeCount}
+                    />
+                    <NavButton active={activeTab === 'spaces'} onClick={() => handleTabChange('spaces')} icon={<Users size={24} />} label={t('nav.spaces')} />
+                    <NavButton active={activeTab === 'discover'} onClick={() => handleTabChange('discover')} icon={<Search size={24} />} label={t('nav.discover')} />
+                    <NavButton active={activeTab === 'profile'} onClick={() => handleTabChange('profile')} icon={<User size={24} />} label={t('nav.profile')} />
                 </nav>
             </div>
 
@@ -189,7 +266,7 @@ const MainApp: React.FC = () => {
                                 </div>
                             )}
                         </div>
-                        {notifications.length > 0 && unreadCount > 0 && (
+                        {notifications.length > 0 && globalUnreadCount > 0 && (
                             <div className="p-4 border-t dark:border-gray-800 sticky bottom-0 bg-white dark:bg-gray-900 rounded-b-2xl">
                                 <button onClick={markAllAsRead} className="w-full py-3 text-sm font-bold text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white">
                                     Mark all as read
@@ -208,28 +285,48 @@ interface NavButtonProps {
     onClick: () => void;
     icon: React.ReactNode;
     label: string;
+    badge?: number;
 }
 
-const NavButton: React.FC<NavButtonProps> = ({ active, onClick, icon, label }) => (
+const NavButton: React.FC<NavButtonProps> = ({ active, onClick, icon, label, badge }) => (
     <button
         onClick={onClick}
-        className={`flex flex-col items-center transition-all ${active ? 'text-[#ff1744]' : 'text-gray-400 hover:text-gray-600'}`}
+        className={`flex flex-col items-center transition-all relative ${active ? 'text-[#ff1744]' : 'text-gray-400 hover:text-gray-600'}`}
     >
-        {icon}
+        <div className="relative">
+            {icon}
+            {badge !== undefined && badge > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 flex items-center justify-center bg-[#ff1744] text-white text-[9px] font-bold rounded-full px-0.5 border-2 border-white dark:border-gray-900">
+                    {badge > 99 ? '99+' : badge}
+                </span>
+            )}
+        </div>
         <span className="text-[10px] mt-1 font-medium">{label}</span>
     </button>
 );
 
-const NavButtonDesktop: React.FC<NavButtonProps> = ({ active, onClick, icon, label }) => (
+const NavButtonDesktop: React.FC<NavButtonProps> = ({ active, onClick, icon, label, badge }) => (
     <button
         onClick={onClick}
-        className={`flex items-center gap-4 w-full p-3 rounded-xl transition-all ${active
+        className={`flex items-center gap-4 w-full p-3 rounded-xl transition-all relative group ${active
             ? 'bg-red-50 dark:bg-red-900/10 text-[#ff1744] font-bold'
             : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
             }`}
     >
-        {icon}
-        <span className="text-lg">{label}</span>
+        <div className="relative">
+            {icon}
+            {badge !== undefined && badge > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-[16px] h-4 flex items-center justify-center bg-[#ff1744] text-white text-[9px] font-bold rounded-full px-0.5 border-2 border-white dark:border-gray-900">
+                    {badge > 99 ? '99+' : badge}
+                </span>
+            )}
+        </div>
+        <span className="text-lg flex-1 text-left">{label}</span>
+        {badge !== undefined && badge > 0 && (
+            <span className="bg-[#ff1744] text-white text-xs px-2 py-0.5 rounded-full font-bold shadow-sm">
+                {badge > 99 ? '99+' : badge}
+            </span>
+        )}
     </button>
 );
 

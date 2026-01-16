@@ -1063,7 +1063,7 @@ const ChatRoom = () => {
                                             onSwipeReply={handleSwipeReply}
                                             onEdit={handleEditMessage}
                                             onDelete={handleDeleteMessage}
-                                            onDelete={handleDeleteMessage}
+
                                             onForward={setForwardingMessage}
                                             onPin={handlePinMessage}
                                             onMediaClick={(url, type) => {

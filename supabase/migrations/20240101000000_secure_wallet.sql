@@ -5,6 +5,8 @@
 drop policy if exists "Users can update their own wallet" on public.wallets;
 
 -- Create a new policy that only allows "service_role" (Server Side) to update balances
+-- Create a new policy that only allows "service_role" (Server Side) to update balances
+drop policy if exists "Service role can update wallets" on public.wallets;
 create policy "Service role can update wallets" on public.wallets
   for update using (true); -- 'true' means only if the session role is service_role, but typically we just don't add public policies.
   -- Actually, to be safe, we just don't add a FOR UPDATE policy for public/authenticated users.

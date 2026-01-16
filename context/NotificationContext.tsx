@@ -21,6 +21,11 @@ interface NotificationContextType {
     loading: boolean;
     sentMessageSound: string;
     setSentMessageSound: (sound: string) => void;
+    // Debug / Diagnostics
+    fcmToken: string | null;
+    setFcmToken: (token: string | null) => void;
+    permissionStatus: string;
+    setPermissionStatus: (status: string) => void;
 }
 
 const NotificationContext = createContext<NotificationContextType>({
@@ -31,6 +36,10 @@ const NotificationContext = createContext<NotificationContextType>({
     loading: true,
     sentMessageSound: 'pop',
     setSentMessageSound: () => { },
+    fcmToken: null,
+    setFcmToken: () => { },
+    permissionStatus: 'unknown',
+    setPermissionStatus: () => { },
 });
 
 export const NotificationProvider = ({ children }: { children: React.ReactNode }) => {
@@ -40,6 +49,8 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
     const [sentMessageSound, setSentMessageSound] = useState<string>(() => {
         return localStorage.getItem('sentMessageSound') || 'pop';
     });
+    const [fcmToken, setFcmToken] = useState<string | null>(null);
+    const [permissionStatus, setPermissionStatus] = useState<string>('unknown');
 
     useEffect(() => {
         localStorage.setItem('sentMessageSound', sentMessageSound);
@@ -124,7 +135,19 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
     };
 
     return (
-        <NotificationContext.Provider value={{ notifications, unreadCount, markAsRead, markAllAsRead, loading, sentMessageSound, setSentMessageSound }}>
+        <NotificationContext.Provider value={{
+            notifications,
+            unreadCount,
+            markAsRead,
+            markAllAsRead,
+            loading,
+            sentMessageSound,
+            setSentMessageSound,
+            fcmToken,
+            setFcmToken,
+            permissionStatus,
+            setPermissionStatus
+        }}>
             {children}
         </NotificationContext.Provider>
     );
