@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import QRCode from 'react-qr-code';
-import { Html5QrcodeScanner } from 'html5-qrcode';
+import QrScanner from 'qr-scanner';
 import { X, Copy, Check, Info } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../services/supabase';
@@ -19,55 +19,52 @@ const QRCodeModal: React.FC<QRCodeModalProps> = ({ isOpen, onClose }) => {
     const [scanError, setScanError] = useState('');
     const [scannedData, setScannedData] = useState('');
 
-    // Use a ref to prevent double initialization in Strict Mode
-    const scannerRef = useRef<Html5QrcodeScanner | null>(null);
+    // Video element ref
+    const videoRef = useRef<HTMLVideoElement>(null);
+    const scannerRef = useRef<QrScanner | null>(null);
 
-    // Scanner Initialization Effect
+    // Initialization Effect
     useEffect(() => {
         if (isOpen && activeTab === 'scan-code' && !scannedData) {
-            // Slight delay to ensure DOM is ready
+            // Slight delay to ensure video element is mounted
             const timer = setTimeout(() => {
-                if (scannerRef.current) return; // Already initialized
+                if (videoRef.current && !scannerRef.current) {
+                    const scanner = new QrScanner(
+                        videoRef.current,
+                        (result) => {
+                            // result is an object { data: string, ... } or string depending on version, 
+                            // usually object in newer versions.
+                            const data = typeof result === 'string' ? result : result?.data;
+                            if (data) handleScan(data);
+                        },
+                        {
+                            onDecodeError: (error) => {
+                                // console.log(error); // ignore errors
+                            },
+                            highlightScanRegion: true,
+                            highlightCodeOutline: true,
+                        }
+                    );
 
-                // Check if element exists
-                if (!document.getElementById('reader')) return;
-
-                const scanner = new Html5QrcodeScanner(
-                    "reader",
-                    {
-                        fps: 10,
-                        qrbox: { width: 250, height: 250 },
-                        aspectRatio: 1.0
-                    },
-                    false
-                );
-
-                scannerRef.current = scanner;
-
-                scanner.render(
-                    (decodedText) => {
-                        handleScan(decodedText);
-                    },
-                    (error) => {
-                        // Ignore standard scanning errors to keep console clean
-                        // console.warn(error);
-                    }
-                );
+                    scanner.start().catch(err => console.error("Scanner start error", err));
+                    scannerRef.current = scanner;
+                }
             }, 100);
 
             return () => {
                 clearTimeout(timer);
                 if (scannerRef.current) {
-                    scannerRef.current.clear().catch(err => console.error("Failed to clear scanner", err));
+                    scannerRef.current.stop();
+                    scannerRef.current.destroy();
                     scannerRef.current = null;
                 }
             };
         }
 
         return () => {
-            // Cleanup if switching tabs or closing modal specifically
             if (scannerRef.current) {
-                scannerRef.current.clear().catch(err => console.error("Cleanup error", err));
+                scannerRef.current.stop();
+                scannerRef.current.destroy();
                 scannerRef.current = null;
             }
         };
@@ -88,9 +85,10 @@ const QRCodeModal: React.FC<QRCodeModalProps> = ({ isOpen, onClose }) => {
             if (data.startsWith('voxspace:user:')) {
                 setScannedData(data); // prevent further scans
 
-                // Stop scanner immediately on success
+                // Stop scanner
                 if (scannerRef.current) {
-                    scannerRef.current.clear().catch(e => console.error("Clear error", e));
+                    scannerRef.current.stop();
+                    scannerRef.current.destroy();
                     scannerRef.current = null;
                 }
 
@@ -173,15 +171,31 @@ const QRCodeModal: React.FC<QRCodeModalProps> = ({ isOpen, onClose }) => {
                             </button>
                         </div>
                     ) : (
-                        <div className="w-full flex flex-col items-center justify-center animate-in slide-in-from-right duration-200">
-                            <div id="reader" className="w-[300px] rounded-xl overflow-hidden" />
+                        <div className="w-full flex flex-col items-center justify-center animate-in slide-in-from-right duration-200 bg-black rounded-xl overflow-hidden relative">
+                            {/* Video Element for QrScanner */}
+                            <video
+                                ref={videoRef}
+                                className="w-full h-full object-cover"
+                                playsInline // Important for iOS
+                                muted // Important for some browsers to autoplay
+                            />
 
                             {scanError && (
-                                <div className="mt-4 bg-red-50 text-red-600 px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 text-center">
+                                <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 z-20 bg-red-500 text-white px-4 py-2 rounded-full text-sm font-bold flex items-center gap-2 shadow-lg whitespace-nowrap">
                                     <Info size={16} className="shrink-0" />
                                     {scanError}
                                 </div>
                             )}
+
+                            {/* Finder overlay */}
+                            <div className="absolute inset-0 pointer-events-none border-[40px] border-black/50">
+                                <div className="w-full h-full border-2 border-white/50 relative">
+                                    <div className="absolute top-0 left-0 w-4 h-4 border-t-4 border-l-4 border-[#ff1744]"></div>
+                                    <div className="absolute top-0 right-0 w-4 h-4 border-t-4 border-r-4 border-[#ff1744]"></div>
+                                    <div className="absolute bottom-0 left-0 w-4 h-4 border-b-4 border-l-4 border-[#ff1744]"></div>
+                                    <div className="absolute bottom-0 right-0 w-4 h-4 border-b-4 border-r-4 border-[#ff1744]"></div>
+                                </div>
+                            </div>
                         </div>
                     )}
                 </div>
