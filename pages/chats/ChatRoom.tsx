@@ -14,8 +14,9 @@ import ErrorBoundary from '../../components/ErrorBoundary';
 import { cn } from '../../lib/utils';
 import { generateVideoThumbnail } from '../../lib/videoUtils';
 import {
-    ArrowLeft, Phone, Video, MoreVertical, Loader2, Clock, Trash2, Pin, ChevronDown, User, Image as ImageIcon, Ban, ShieldAlert
+    ArrowLeft, Phone, Video, MoreVertical, Loader2, Clock, Trash2, Pin, ChevronDown, User, Image as ImageIcon, Ban, ShieldAlert, Check, X
 } from 'lucide-react';
+
 import { useNotifications } from '../../context/NotificationContext';
 import { BadgeIcon } from '../../components/BadgeIcon';
 import { BadgeType } from '../../constants/badges';
@@ -142,6 +143,7 @@ const ChatRoom = () => {
                 .from('chat_participants')
                 .select(`
                     user_id,
+                    status,
                     profiles:user_id (
                         id,
                         full_name,
@@ -177,6 +179,12 @@ const ChatRoom = () => {
                         about_privacy: profile.about_privacy || 'everyone',
                     });
 
+                    // Set My Status
+                    const myParticipant = participantsData.find((p: any) => p.user_id === user.id);
+                    if (myParticipant) {
+                        setParticipantStatus(myParticipant.status);
+                    }
+
                     // Check Block Status
                     const { data: blockData } = await supabase
                         .from('blocked_users')
@@ -190,8 +198,19 @@ const ChatRoom = () => {
 
                         if (iBlockedThem) setParticipantStatus('blocked');
                         else if (theyBlockedMe) setParticipantStatus('blocked_by');
-                    } else {
-                        setParticipantStatus('accepted');
+                    } else if (myParticipant && myParticipant.status !== 'pending') {
+                        // Only default to accepted if NOT pending and NOT blocked
+                        // Actually, myParticipant.status should be the truth. 
+                        // If pending, it stays pending. If accepted, it stays accepted.
+                        // But if we want to default for some reason?
+                        // If we found myParticipant, we already set it. 
+                        // So we ONLY need to override if BLOCKED.
+                        // If NOT blocked, we trust myParticipant.status.
+                        // So this else block is actually harmful if we already set checking myParticipant.
+                        // But what if myParticipant is NOT found? Then we might assume accepted? 
+                        // If not found, they aren't in the chat... so that's an edge case.
+                        // Let's just remove the else block or handle the null case.
+                        if (!myParticipant) setParticipantStatus('accepted');
                     }
                 }
             } else {
@@ -899,6 +918,46 @@ const ChatRoom = () => {
         }
     };
 
+    const handleAcceptRequest = async () => {
+        if (!user || !chatId) return;
+        try {
+            const { error } = await supabase
+                .from('chat_participants')
+                .update({ status: 'accepted' })
+                .eq('chat_id', chatId)
+                .eq('user_id', user.id);
+
+            if (error) throw error;
+            setParticipantStatus('accepted');
+            // Notify sender? usually handled by realtime or they see it enabled.
+        } catch (e) {
+            console.error("Error accepting request", e);
+            alert("Failed to accept request");
+        }
+    };
+
+    const handleRejectRequest = async () => {
+        if (!confirm("Reject this message request? The chat will be removed.")) return;
+        if (!user || !chatId) return;
+        try {
+            // Clean up - delete participant row or set to rejected
+            // Deleting allows them to request again potentially, or just clean up.
+            // If we want to block, that's separate. 'Rejected' status might be better if we want to hide it but keep record.
+            // For now, let's just delete the participant entry so it vanishes from list.
+            const { error } = await supabase
+                .from('chat_participants')
+                .delete()
+                .eq('chat_id', chatId)
+                .eq('user_id', user.id);
+
+            if (error) throw error;
+            navigate('/chats');
+        } catch (e) {
+            console.error("Error rejecting request", e);
+            alert("Failed to reject request");
+        }
+    };
+
     return (
         <ErrorBoundary>
             <div className={cn("flex flex-col h-[100dvh] w-full max-w-full bg-[#f0f2f5] dark:bg-black transition-transform fixed inset-0 overflow-hidden", isBuzzing && "animate-shake")}>
@@ -981,7 +1040,12 @@ const ChatRoom = () => {
                                 {isMenuOpen && (
                                     <div className="absolute right-0 top-12 w-48 bg-white dark:bg-gray-900 rounded-xl shadow-xl border border-gray-100 dark:border-gray-800 py-1 z-50 animate-in fade-in zoom-in-95 duration-200">
                                         <button
-                                            onClick={() => { navigate(`/user/${chatId}`); setIsMenuOpen(false); }}
+                                            onClick={() => {
+                                                if (chatProfile?.id) {
+                                                    navigate(`/user/${chatProfile.id}`);
+                                                }
+                                                setIsMenuOpen(false);
+                                            }}
                                             className="w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center gap-3 text-sm text-gray-700 dark:text-gray-200"
                                         >
                                             <User size={16} /> View Contact
@@ -1128,16 +1192,36 @@ const ChatRoom = () => {
                                 />
                             </div>
                         ) : !loading && (
-                            <div className="p-6 bg-white border-t border-gray-200 text-center safe-bottom">
-                                <p className="text-gray-500">
-                                    <p className="text-gray-500">
+                            <div className="p-6 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 safe-bottom">
+                                {participantStatus === 'pending' ? (
+                                    <div className="flex flex-col gap-4">
+                                        <p className="text-center text-gray-500 dark:text-gray-400 text-sm">
+                                            {chatProfile?.full_name} wants to send you a message.
+                                        </p>
+                                        <div className="flex gap-3">
+                                            <button
+                                                onClick={handleRejectRequest}
+                                                className="flex-1 py-3 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 font-bold rounded-xl flex items-center justify-center gap-2 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                                            >
+                                                <X size={18} /> Delete
+                                            </button>
+                                            <button
+                                                onClick={handleAcceptRequest}
+                                                className="flex-1 py-3 bg-[#ff1744] text-white font-bold rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-red-500/20 active:scale-95 transition-all"
+                                            >
+                                                <Check size={18} /> Accept
+                                            </button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <p className="text-gray-500 text-center">
                                         {participantStatus === 'blocked'
                                             ? "You have blocked this user."
                                             : participantStatus === 'blocked_by'
                                                 ? "You can no longer send messages to this user."
-                                                : "Request pending."}
+                                                : "Chat unavailable."}
                                     </p>
-                                </p>
+                                )}
                             </div>
                         )
                     }

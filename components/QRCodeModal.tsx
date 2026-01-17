@@ -24,44 +24,53 @@ const QRCodeModal: React.FC<QRCodeModalProps> = ({ isOpen, onClose }) => {
     const scannerRef = useRef<QrScanner | null>(null);
 
     // Initialization Effect
+    // Initialization Effect
     useEffect(() => {
-        if (isOpen && activeTab === 'scan-code' && !scannedData) {
-            // Slight delay to ensure video element is mounted
-            const timer = setTimeout(() => {
+        let scanner: QrScanner | null = null;
+        let mounted = true;
+
+        const startScanner = async () => {
+            if (isOpen && activeTab === 'scan-code' && !scannedData) {
+                // Wait for video element
+                await new Promise(resolve => setTimeout(resolve, 300));
+
+                if (!mounted) return;
+
                 if (videoRef.current && !scannerRef.current) {
-                    const scanner = new QrScanner(
-                        videoRef.current,
-                        (result) => {
-                            // result is an object { data: string, ... } or string depending on version, 
-                            // usually object in newer versions.
-                            const data = typeof result === 'string' ? result : result?.data;
-                            if (data) handleScan(data);
-                        },
-                        {
-                            onDecodeError: (error) => {
-                                // console.log(error); // ignore errors
+                    try {
+                        scanner = new QrScanner(
+                            videoRef.current,
+                            (result) => {
+                                const data = typeof result === 'string' ? result : result?.data;
+                                if (data) handleScan(data);
                             },
-                            highlightScanRegion: true,
-                            highlightCodeOutline: true,
-                        }
-                    );
+                            {
+                                onDecodeError: () => { }, // Ignore decode errors
+                                highlightScanRegion: true,
+                                highlightCodeOutline: true,
+                                returnDetailedScanResult: true, // For better compatibility
+                            }
+                        );
 
-                    scanner.start().catch(err => console.error("Scanner start error", err));
-                    scannerRef.current = scanner;
+                        await scanner.start();
+                        scannerRef.current = scanner;
+                        setScanError(''); // Clear previous errors
+                    } catch (err: any) {
+                        console.error("Scanner failed to start:", err);
+                        setScanError(err.message || "Camera access denied or not available");
+                    }
                 }
-            }, 100);
+            }
+        };
 
-            return () => {
-                clearTimeout(timer);
-                if (scannerRef.current) {
-                    scannerRef.current.stop();
-                    scannerRef.current.destroy();
-                    scannerRef.current = null;
-                }
-            };
-        }
+        startScanner();
 
         return () => {
+            mounted = false;
+            if (scanner) {
+                scanner.stop();
+                scanner.destroy();
+            }
             if (scannerRef.current) {
                 scannerRef.current.stop();
                 scannerRef.current.destroy();
