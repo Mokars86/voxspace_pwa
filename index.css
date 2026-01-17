@@ -73,7 +73,6 @@
     font-feature-settings: "rlig" 1, "calt" 1;
   }
 }
-}
 
 html.dark body {
   background-color: hsl(var(--background));
