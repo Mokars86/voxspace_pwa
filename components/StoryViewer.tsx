@@ -34,26 +34,52 @@ const StoryViewer: React.FC<StoryViewerProps> = ({ stories, initialIndex, onClos
         if (!currentStory) return;
         setLoadingViewers(true);
         try {
-            // 1. Fetch Viewers from story_views joined with profiles
+            // 1. Fetch Viewers from story_views (just IDs)
             const { data: viewsData, error: viewsError } = await supabase
                 .from('story_views')
-                .select(`
-                    user_id,
-                    created_at,
-                    profiles (
-                        full_name, avatar_url, username
-                    )
-                `)
+                .select('user_id, created_at')
                 .eq('story_id', currentStory.id)
                 .order('created_at', { ascending: false });
 
-            if (viewsError) throw viewsError;
-            setViewersList(viewsData || []);
+            if (viewsError) {
+                console.error("Error fetching viewers:", viewsError);
+                // Fallback
+            }
 
-            // 2. Fetch Likes Count from story_interactions
+            const rawViews = viewsData || [];
+
+            // 2. Fetch Profiles manual join
+            // Supabase/PostgREST join only works if there is a direct FK to profiles.
+            // If user_id refs auth.users, we can't join public.profiles easily.
+            let populatedViewers: any[] = [];
+
+            if (rawViews.length > 0) {
+                const userIds = rawViews.map((v: any) => v.user_id);
+
+                const { data: profilesData, error: profilesError } = await supabase
+                    .from('profiles')
+                    .select('id, full_name, avatar_url, username')
+                    .in('id', userIds);
+
+                if (!profilesError && profilesData) {
+                    // Merge data
+                    const profilesMap = new Map(profilesData.map((p: any) => [p.id, p]));
+
+                    populatedViewers = rawViews.map((v: any) => {
+                        return {
+                            ...v,
+                            profiles: profilesMap.get(v.user_id)
+                        };
+                    }).filter((v: any) => v.profiles); // Only keep if profile found
+                }
+            }
+
+            setViewersList(populatedViewers);
+
+            // 3. Fetch Likes Count from story_interactions
             const { count, error: likesError } = await supabase
                 .from('story_interactions')
-                .select('id', { count: 'exact', head: true })
+                .select('*', { count: 'exact', head: true })
                 .eq('story_id', currentStory.id)
                 .eq('reaction_type', 'like');
 
@@ -69,6 +95,24 @@ const StoryViewer: React.FC<StoryViewerProps> = ({ stories, initialIndex, onClos
 
     const currentStory = stories[currentIndex];
 
+    // Check if liked
+    const checkLikeStatus = async () => {
+        if (!currentStory || !user) return;
+        const { data, error } = await supabase
+            .from('story_interactions')
+            .select('id')
+            .eq('story_id', currentStory.id)
+            .eq('user_id', user.id)
+            .eq('reaction_type', 'like')
+            .maybeSingle();
+
+        if (!error && data) {
+            setLiked(true);
+        } else {
+            setLiked(false);
+        }
+    };
+
     // Reset progress & state on story change
     useEffect(() => {
         setProgress(0);
@@ -83,8 +127,7 @@ const StoryViewer: React.FC<StoryViewerProps> = ({ stories, initialIndex, onClos
             setIsPaused(false);
         }
 
-        // Check if liked (In a real app, fetch this)
-        // checkLikeStatus();
+        checkLikeStatus();
     }, [currentIndex, currentStory]);
 
     useEffect(() => {
@@ -94,10 +137,20 @@ const StoryViewer: React.FC<StoryViewerProps> = ({ stories, initialIndex, onClos
             // Don't record own view or if already viewed (optimization)
             if (currentStory.user_id === user.id) return;
 
+            // Check if already viewed to avoid duplicate inserts if unique constraint missing
+            const { data: existing } = await supabase
+                .from('story_views')
+                .select('id')
+                .eq('story_id', currentStory.id)
+                .eq('user_id', user.id)
+                .maybeSingle();
+
+            if (existing) return;
+
             await supabase.from('story_views').insert({
                 story_id: currentStory.id,
                 user_id: user.id
-            }).then(({ error }) => { if (error && error.code !== '23505') console.error(error); }); // Ignore duplicates
+            }).then(({ error }) => { if (error && error.code !== '23505') console.error("View Record Error:", error); });
         };
         recordView();
     }, [currentStory, user]);
