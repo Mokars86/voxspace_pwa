@@ -4,6 +4,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { cn } from '../lib/utils';
 import { ChatPreview } from '../types';
 import { useAuth } from '../context/AuthContext';
+import { storeChats, getAllChats } from '../utils/idb';
 import { supabase } from '../services/supabase';
 import PinModal from './PinModal';
 

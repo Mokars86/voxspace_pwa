@@ -20,6 +20,7 @@ import {
 import { useNotifications } from '../../context/NotificationContext';
 import { BadgeIcon } from '../../components/BadgeIcon';
 import { BadgeType } from '../../constants/badges';
+import { useNetworkStatus } from '../../hooks/useNetworkStatus';
 
 interface Message extends ChatMessage {
     // Extended properties if needed, currently matching ChatMessage
@@ -357,7 +358,18 @@ const ChatRoom = () => {
     // Realtime & Effects
     useEffect(() => {
         fetchMessages().then(() => markMessagesAsRead()); // Mark read after initial fetch
+    }, [chatId]); // Run once on mount/chatId change
 
+    // Auto-reconnect
+    const isOnline = useNetworkStatus();
+    useEffect(() => {
+        if (isOnline) {
+            console.log("Back online, refreshing messages...");
+            fetchMessages();
+        }
+    }, [isOnline]);
+
+    useEffect(() => {
         if (!chatId || !user) return;
 
         const handleNewMessage = (newMsgRaw: any) => {

@@ -61,8 +61,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                         fetchProfile(session.user.id);
                     }
                 }
-            } catch (error) {
+            } catch (error: any) {
                 console.error("Auth initialization error:", error);
+                // If the refresh token is invalid, clear the session completely
+                if (error?.message?.includes("Invalid Refresh Token") || error?.message?.includes("Refresh Token Not Found") || error?.code === 'invalid_grant') {
+                    console.warn("Invalid token detected, signing out...");
+                    await supabase.auth.signOut();
+                    if (mounted) {
+                        setSession(null);
+                        setUser(null);
+                        setProfile(null);
+                    }
+                }
             } finally {
                 if (mounted) setLoading(false);
             }
