@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { useTheme } from './context/ThemeContext';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 import Welcome from './pages/auth/Welcome';
@@ -63,12 +64,68 @@ import { usePushNotifications } from './hooks/usePushNotifications';
 import { useNetworkStatus } from './hooks/useNetworkStatus';
 import { WifiOff } from 'lucide-react';
 
-const App: React.FC = () => {
+// DEBUG COMPONENT
+// DEBUG COMPONENT
+const DebugOverlay = () => {
+  const { session, user, loading } = useAuth();
+  const [storageKeys, setStorageKeys] = useState<string[]>([]);
+  const [lastError, setLastError] = useState<string>('');
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setStorageKeys(Object.keys(localStorage));
+      // @ts-ignore
+      if (window.lastAuthError) setLastError(JSON.stringify(window.lastAuthError));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  if (process.env.NODE_ENV === 'production') return null;
+
+  return (
+    <div style={{
+      position: 'fixed',
+      bottom: '10px',
+      right: '10px',
+      background: 'rgba(0,0,0,0.85)',
+      color: '#0f0',
+      padding: '12px',
+      borderRadius: '8px',
+      fontSize: '11px',
+      fontFamily: 'monospace',
+      zIndex: 9999,
+      maxWidth: '350px',
+      pointerEvents: 'none',
+      border: '1px solid #00ff00',
+      boxShadow: '0 0 10px rgba(0,255,0,0.2)'
+    }}>
+      <div style={{ borderBottom: '1px solid #333', marginBottom: '5px', paddingBottom: '2px' }}><strong>DEBUG HOST: 5173</strong></div>
+      <div>STATUS: {loading ? '⌛ LOADING' : (session ? '✅ LOGGED IN' : '❌ LOGGED OUT')}</div>
+      <div>USER: {user?.email || 'N/A'}</div>
+
+      {lastError && (
+        <div style={{ color: '#ff4444', marginTop: '5px', fontWeight: 'bold' }}>
+          LAST ERROR: {lastError.substring(0, 50)}...
+        </div>
+      )}
+
+      <div style={{ marginTop: '8px', borderTop: '1px solid #333', paddingTop: '4px' }}>
+        <strong>Start Logged Keys:</strong>
+        {storageKeys.filter(k => k.includes('sb-') || k.includes('token')).map(k => (
+          <div key={k} style={{ color: '#aaa' }}>{k.substring(0, 35)}...</div>
+        ))}
+        {storageKeys.length === 0 && <div style={{ color: '#888' }}>(No storage keys found)</div>}
+      </div>
+    </div>
+  );
+};
+
+function App() {
+  const { theme } = useTheme();
+  const { session, loading, user } = useAuth();
   usePushNotifications();
   const isOnline = useNetworkStatus();
 
-
-  const { loading } = useAuth();
 
   React.useEffect(() => {
     // Hide splash screen after app mounts AND auth is ready

@@ -24,10 +24,22 @@ let lastTokenRefreshTime = 0;
 // Helper to find the correct key dynamically
 const findSupabaseSessionKey = () => {
     try {
+        // 1. Try standard Supabase naming convention
         for (let i = 0; i < localStorage.length; i++) {
             const key = localStorage.key(i);
             if (key && key.startsWith('sb-') && key.endsWith('-auth-token')) {
                 return key;
+            }
+        }
+        // 2. Fallback: Search ALL keys for a likely session object
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key) {
+                const value = localStorage.getItem(key);
+                if (value && value.includes('access_token') && value.includes('refresh_token')) {
+                    console.log("[Network Firewall] Found likely session key via content scan:", key);
+                    return key;
+                }
             }
         }
     } catch (e) {

@@ -91,6 +91,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                     error?.message?.includes("jwks")) {
 
                     console.warn("Auth Error detected (possible loop), forcing cleanup...", error);
+                    // @ts-ignore
+                    window.lastAuthError = error;
                     await forceCleanup();
                 }
             } finally {
