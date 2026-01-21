@@ -484,7 +484,7 @@ const SpaceDetail: React.FC = () => {
     const isOwner = user?.id === space.owner_id;
 
     return (
-        <div className="flex flex-col h-screen bg-white relative">
+        <div className="flex flex-col h-screen bg-white dark:bg-black relative">
             {/* Header Image */}
             <div className="h-48 md:h-64 relative group flex-shrink-0">
                 <img
@@ -575,7 +575,7 @@ const SpaceDetail: React.FC = () => {
                             "flex-1 py-3 text-sm font-bold uppercase tracking-wide border-b-2 transition-colors",
                             activeTab === tab
                                 ? "border-[#ff1744] text-[#ff1744]"
-                                : "border-transparent text-gray-400 hover:text-gray-600"
+                                : "border-transparent text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 bg-white dark:bg-black"
                         )}
                     >
                         {tab}
@@ -584,12 +584,12 @@ const SpaceDetail: React.FC = () => {
             </div>
 
             {/* Content Body */}
-            <div className="flex-1 overflow-y-auto bg-gray-50 pb-20">
+            <div className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 pb-20">
                 {/* POSTS TAB */}
                 {activeTab === 'posts' && (
                     <div className="p-4 space-y-4">
                         {/* Pinned / About */}
-                        <div className="bg-white p-4 rounded-2xl shadow-sm">
+                        <div className="bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-sm">
                             <h3 className="text-xs font-bold text-gray-400 uppercase mb-2">About this Space</h3>
                             {isEditing ? (
                                 <textarea
@@ -598,12 +598,12 @@ const SpaceDetail: React.FC = () => {
                                     className="w-full h-24 p-2 border rounded-lg text-sm focus:border-[#ff1744] outline-none"
                                 />
                             ) : (
-                                <p className="text-gray-700 text-sm leading-relaxed whitespace-pre-wrap">{space.description}</p>
+                                <p className="text-gray-700 dark:text-gray-300 text-sm leading-relaxed whitespace-pre-wrap">{space.description}</p>
                             )}
                         </div>
 
                         {/* Create Post */}
-                        <div className="bg-white p-4 rounded-2xl shadow-sm space-y-3">
+                        <div className="bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-sm space-y-3">
                             <div className="flex gap-3">
                                 <div className="w-10 h-10 rounded-full bg-gray-200 overflow-hidden flex-shrink-0">
                                     {user?.user_metadata?.avatar_url && <img src={user.user_metadata.avatar_url} className="w-full h-full object-cover" />}
@@ -612,7 +612,7 @@ const SpaceDetail: React.FC = () => {
                                     <input
                                         type="text"
                                         placeholder={isRecording ? "Recording audio..." : "Post something to the space..."}
-                                        className="w-full bg-gray-50 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#ff1744] outline-none"
+                                        className="w-full bg-gray-50 dark:bg-gray-700 dark:text-white rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#ff1744] outline-none"
                                         value={newPostContent}
                                         onChange={(e) => setNewPostContent(e.target.value)}
                                         disabled={isRecording}
