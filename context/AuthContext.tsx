@@ -32,54 +32,115 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     const fetchProfile = async (userId: string) => {
         try {
+            console.log("Fetching profile for:", userId);
             const { data, error } = await supabase
                 .from('profiles')
                 .select('*')
                 .eq('id', userId)
                 .single();
 
-            if (!error && data) {
+            if (error) {
+                console.error("Error fetching profile:", error);
+            }
+
+            if (data) {
+                console.log("Profile data loaded:", data);
                 setProfile(data);
+            } else {
+                console.warn("No profile data found for user:", userId);
             }
         } catch (error) {
-            console.error("Error fetching profile", error);
+            console.error("Exception fetching profile", error);
         }
     };
+
+    const lastRefreshRef = React.useRef<number>(0);
+    const accessTokenRef = React.useRef<string | undefined>(undefined);
 
     useEffect(() => {
         let mounted = true;
 
         const initAuth = async () => {
             try {
+                // Check for existing session
                 const { data: { session }, error } = await supabase.auth.getSession();
-                if (error) throw error;
+
+                if (error) {
+                    console.error("Error getting session:", error);
+                    throw error;
+                }
 
                 if (mounted) {
-                    setSession(session);
-                    setUser(session?.user ?? null);
-                    if (session?.user) {
+                    if (session) {
+                        console.log("Session restored:", session.user.id);
+                        accessTokenRef.current = session.access_token;
+                        setSession(session);
+                        setUser(session.user);
                         fetchProfile(session.user.id);
+                    } else {
+                        console.log("No active session found.");
                     }
                 }
-            } catch (error) {
+            } catch (error: any) {
                 console.error("Auth initialization error:", error);
+
+                // If 429 or invalid token, clean up
+                if (error?.status === 429 ||
+                    error?.message?.includes("Invalid Refresh Token") ||
+                    error?.message?.includes("Refresh Token Not Found") ||
+                    error?.code === 'invalid_grant' ||
+                    error?.message?.includes("jwks")) {
+
+                    console.warn("Auth Error detected (possible loop), forcing cleanup...", error);
+                    await forceCleanup();
+                }
             } finally {
-                if (mounted) setLoading(false);
+                if (mounted) {
+                    setLoading(false);
+                }
             }
         };
 
         initAuth();
 
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-            if (mounted) {
-                setSession(session);
-                setUser(session?.user ?? null);
-                if (session?.user) {
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+            console.log("Auth State Change:", event);
+
+            if (event === 'SIGNED_IN' && session) {
+                if (mounted) {
+                    accessTokenRef.current = session.access_token;
+                    setSession(session);
+                    setUser(session.user);
                     fetchProfile(session.user.id);
-                } else {
+                }
+            } else if (event === 'SIGNED_OUT') {
+                if (mounted) {
+                    setSession(null);
+                    setUser(null);
                     setProfile(null);
                 }
-                setLoading(false);
+                await clearLocalSession();
+            } else if (event === 'TOKEN_REFRESHED') {
+                // 1. Check for duplicate token (Event Echo)
+                if (session?.access_token === accessTokenRef.current) {
+                    // console.log("Blocking duplicate TOKEN_REFRESHED event");
+                    return;
+                }
+
+                // 2. Debounce: Ignore if updated less than 2s ago
+                const now = Date.now();
+                if (now - lastRefreshRef.current < 2000) {
+                    console.warn("Rapid refresh detected. Ignoring event to maintain session stability.");
+                    return;
+                }
+                lastRefreshRef.current = now;
+
+                console.log("Processing legitimate token refresh");
+                if (mounted) {
+                    accessTokenRef.current = session?.access_token;
+                    setSession(session);
+                    setUser(session?.user ?? null);
+                }
             }
         });
 
@@ -89,11 +150,37 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         };
     }, []);
 
-    const signOut = async () => {
-        await supabase.auth.signOut();
+    const clearLocalSession = async () => {
+        // 1. Clear Supabase local storage manually
+        Object.keys(localStorage).forEach(key => {
+            if (key.startsWith('sb-') && key.endsWith('-auth-token')) {
+                localStorage.removeItem(key);
+                console.log("Cleared token:", key);
+            }
+        });
+    };
+
+    const forceCleanup = async () => {
+        await clearLocalSession();
+        await supabase.auth.signOut().catch(() => { });
         setSession(null);
         setUser(null);
         setProfile(null);
+    };
+
+    const signOut = async () => {
+        setLoading(true);
+        try {
+            await supabase.auth.signOut();
+        } catch (error) {
+            console.error("Error signing out:", error);
+        } finally {
+            await clearLocalSession();
+            setSession(null);
+            setUser(null);
+            setProfile(null);
+            setLoading(false);
+        }
     };
 
 

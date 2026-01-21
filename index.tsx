@@ -17,21 +17,19 @@ if (!rootElement) {
 
 const root = ReactDOM.createRoot(rootElement);
 root.render(
-  <React.StrictMode>
-    <ErrorBoundary>
-      <BrowserRouter>
-        <AuthProvider>
-          <ThemeProvider defaultMode="light" storageKey="voxspace-theme">
-            <LanguageProvider>
-              <NotificationProvider>
-                <CallProvider>
-                  <App />
-                </CallProvider>
-              </NotificationProvider>
-            </LanguageProvider>
-          </ThemeProvider>
-        </AuthProvider>
-      </BrowserRouter>
-    </ErrorBoundary>
-  </React.StrictMode>
+  <ErrorBoundary>
+    <BrowserRouter>
+      <AuthProvider>
+        <ThemeProvider defaultMode="light" storageKey="voxspace-theme">
+          <LanguageProvider>
+            <NotificationProvider>
+              <CallProvider>
+                <App />
+              </CallProvider>
+            </NotificationProvider>
+          </LanguageProvider>
+        </ThemeProvider>
+      </AuthProvider>
+    </BrowserRouter>
+  </ErrorBoundary>
 );
