@@ -83,7 +83,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                 }
             } catch (error: any) {
                 console.error("Auth initialization error:", error);
-
                 // If 429 or invalid token, clean up
                 if (error?.status === 429 ||
                     error?.message?.includes("Invalid Refresh Token") ||
