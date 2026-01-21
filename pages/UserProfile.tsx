@@ -224,7 +224,7 @@ const UserProfile: React.FC = () => {
     if (!profile) return <div>User not found</div>;
 
     return (
-        <div className="flex flex-col h-screen bg-white">
+        <div className="flex flex-col h-screen bg-white dark:bg-black">
             {/* Header */}
             <div className="h-32 bg-gradient-to-r from-blue-500 to-purple-500 relative">
                 <button onClick={() => navigate(-1)} className="absolute top-4 left-4 p-2 bg-black/20 rounded-full text-white backdrop-blur-sm hover:bg-black/30 transition-colors z-10">
@@ -305,20 +305,20 @@ const UserProfile: React.FC = () => {
 
                 <div>
                     <div className="flex items-center gap-1">
-                        <h1 className="text-2xl font-bold text-gray-900">{profile.full_name}</h1>
+                        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{profile.full_name}</h1>
                     </div>
                     <p className="text-gray-500 text-sm mb-3">@{profile.username}</p>
-                    <p className="text-gray-900 mb-3 whitespace-pre-wrap">
+                    <p className="text-gray-900 dark:text-gray-300 mb-3 whitespace-pre-wrap">
                         {showBio ? (profile.bio || "No bio yet.") : <span className="text-gray-400 italic">Bio hidden</span>}
                     </p>
 
                     <div className="flex items-center gap-4 mb-4">
                         <div className="flex items-center gap-1">
-                            <span className="font-bold text-gray-900">{profile.following_count || 0}</span>
+                            <span className="font-bold text-gray-900 dark:text-white">{profile.following_count || 0}</span>
                             <span className="text-gray-500 text-sm">Following</span>
                         </div>
                         <div className="flex items-center gap-1">
-                            <span className="font-bold text-gray-900">{profile.followers_count || 0}</span>
+                            <span className="font-bold text-gray-900 dark:text-white">{profile.followers_count || 0}</span>
                             <span className="text-gray-500 text-sm">Followers</span>
                         </div>
                     </div>
@@ -383,7 +383,7 @@ const UserProfile: React.FC = () => {
                 </div>
             </div>
 
-            <div className="border-t border-gray-100">
+            <div className="border-t border-gray-100 dark:border-gray-800">
                 {posts.map(post => <PostCard key={post.id} post={post} />)}
                 {posts.length === 0 && <div className="p-8 text-center text-gray-400">No posts yet</div>}
             </div>
