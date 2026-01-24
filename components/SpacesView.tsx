@@ -15,6 +15,7 @@ const SpacesView: React.FC = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
 
   const [activeCategory, setActiveCategory] = useState('All');
+  const [showAllSpaces, setShowAllSpaces] = useState(false);
 
   const fetchSpaces = async () => {
     setLoading(true);
@@ -32,24 +33,24 @@ const SpacesView: React.FC = () => {
 
       if (error) throw error;
 
-      // Filter out spaces user has already joined
-      let recommended = data;
-      if (user) {
+      let displaySpaces = data;
+
+      // If NOT showing all spaces, we filter to show only "Recommended" (unjoined)
+      // If showing ALL spaces, we just show everything (maybe we can visually indicate joined status later)
+      if (!showAllSpaces && user) {
         const { data: joinedData } = await supabase
           .from('space_members')
           .select('space_id')
           .eq('user_id', user.id);
 
         const joinedIds = new Set(joinedData?.map((j: any) => j.space_id));
-        // If we want to show ONLY recommended (not joined), uncomment below:
-        // recommended = data.filter((s: any) => !joinedIds.has(s.id));
-
-        // Current logic: Show all, but could add visuals. 
-        // Requirement was "Recommended Spaces". Assuming strictly unjoined.
-        recommended = data.filter((s: any) => !joinedIds.has(s.id));
+        displaySpaces = data.filter((s: any) => !joinedIds.has(s.id));
       }
 
-      const formattedSpaces: Space[] = recommended.slice(0, 10).map((s: any) => ({
+      // Limit results if not showing all
+      const limit = showAllSpaces ? 100 : 10;
+
+      const formattedSpaces: Space[] = displaySpaces.slice(0, limit).map((s: any) => ({
         id: s.id,
         name: s.name,
         description: s.description,
@@ -69,7 +70,7 @@ const SpacesView: React.FC = () => {
 
   useEffect(() => {
     fetchSpaces();
-  }, [activeCategory]);
+  }, [activeCategory, showAllSpaces]);
 
   return (
     <div className="flex flex-col h-full bg-white dark:bg-gray-900 relative transition-colors">
@@ -135,15 +136,28 @@ const SpacesView: React.FC = () => {
 
         {/* Popular Spaces */}
         <section>
-          <div className="flex items-center gap-2 mb-3">
-            <Globe size={20} className="text-blue-500" />
-            <h3 className="font-bold text-lg dark:text-white">Recommended Spaces</h3>
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <Globe size={20} className="text-blue-500" />
+              <h3 className="font-bold text-lg dark:text-white">
+                {showAllSpaces ? 'All Spaces' : 'Recommended Spaces'}
+              </h3>
+            </div>
+            <button
+              onClick={() => {
+                setShowAllSpaces(!showAllSpaces);
+                // Trigger fetch immediately or depend on useEffect
+              }}
+              className="text-sm text-[#ff1744] font-bold hover:underline"
+            >
+              {showAllSpaces ? 'Show Less' : 'View All'}
+            </button>
           </div>
 
           {loading ? (
             <div className="flex justify-center"><Loader2 className="animate-spin text-gray-400" /></div>
           ) : (
-            <div className="grid grid-cols-2 gap-3">
+            <div className={`grid gap-3 ${showAllSpaces ? 'grid-cols-2 md:grid-cols-3' : 'grid-cols-2'}`}>
               {spaces.length > 0 ? spaces.map(space => (
                 <div
                   key={space.id}
