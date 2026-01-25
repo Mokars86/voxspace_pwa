@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
-import { X, Image, Music, MapPin, Smile, Send, Loader2, Video, BarChart2, Plus } from 'lucide-react';
-import EmojiPicker, { EmojiClickData } from 'emoji-picker-react';
+import { X, Image, Music, Send, Loader2, Video, BarChart2, Plus } from 'lucide-react';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../context/AuthContext';
 
@@ -16,7 +15,7 @@ const CreateModal: React.FC<CreateModalProps> = ({ onClose }) => {
   // Media Upload State
   const [selectedMedia, setSelectedMedia] = useState<{ file: File, type: 'image' | 'video' | 'audio' } | null>(null);
   const [mediaPreview, setMediaPreview] = useState<string | null>(null);
-  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+
 
   // Poll State
   const [isPollMode, setIsPollMode] = useState(false);
@@ -42,7 +41,7 @@ const CreateModal: React.FC<CreateModalProps> = ({ onClose }) => {
     setMediaPreview(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
     if (audioInputRef.current) audioInputRef.current.value = '';
-    setShowEmojiPicker(false);
+
   };
 
   const handlePost = async () => {
@@ -188,23 +187,7 @@ const CreateModal: React.FC<CreateModalProps> = ({ onClose }) => {
               </div>
             )}
 
-            {showEmojiPicker && (
-              <div className="absolute top-full left-0 z-50 shadow-xl rounded-xl">
-                <EmojiPicker
-                  onEmojiClick={(emojiData) => {
-                    setContent(prev => prev + emojiData.emoji);
-                    setShowEmojiPicker(false);
-                  }}
-                  width={320}
-                  height={400}
-                  lazyLoadEmojis={true}
-                />
-                <div
-                  className="fixed inset-0 z-[-1]"
-                  onClick={() => setShowEmojiPicker(false)}
-                />
-              </div>
-            )}
+
           </div>
         </div>
 
@@ -260,13 +243,7 @@ const CreateModal: React.FC<CreateModalProps> = ({ onClose }) => {
             >
               <Music size={22} />
             </button>
-            <button className="hover:bg-red-50 dark:hover:bg-red-900/20 p-2 rounded-full transition-colors"><MapPin size={22} /></button>
-            <button
-              onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-              className={`hover:bg-red-50 dark:hover:bg-red-900/20 p-2 rounded-full transition-colors ${showEmojiPicker ? 'text-[#ff1744] bg-red-50' : ''}`}
-            >
-              <Smile size={22} />
-            </button>
+
           </div>
           <div className="text-xs text-gray-400 font-medium">
             {content.length}/280

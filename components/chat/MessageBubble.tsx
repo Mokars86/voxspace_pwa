@@ -179,13 +179,16 @@ const MessageBubble: React.FC<MessageProps> = ({ message, onSwipeReply, onReact,
 
     // Swipe & Long Press Logic
     const [swipeOffset, setSwipeOffset] = React.useState(0);
-    const touchStartRef = React.useRef<number | null>(null);
+    const touchStartRef = React.useRef<{ x: number, y: number } | null>(null);
     const longPressTimerRef = React.useRef<NodeJS.Timeout | null>(null);
     const SWIPE_THRESHOLD = 50;
 
     const handleTouchStart = (e: React.TouchEvent) => {
         if (showMenu || isEditing) return; // Disable if menu/edit open
-        touchStartRef.current = e.targetTouches[0].clientX;
+        touchStartRef.current = {
+            x: e.targetTouches[0].clientX,
+            y: e.targetTouches[0].clientY
+        };
 
         // Start Long Press Timer
         longPressTimerRef.current = setTimeout(() => {
@@ -197,10 +200,21 @@ const MessageBubble: React.FC<MessageProps> = ({ message, onSwipeReply, onReact,
     const handleTouchMove = (e: React.TouchEvent) => {
         if (touchStartRef.current === null) return;
         const currentX = e.targetTouches[0].clientX;
-        const diffX = currentX - touchStartRef.current; // directional for swipe
+        const currentY = e.targetTouches[0].clientY;
+        const diffX = currentX - touchStartRef.current.x;
+        const diffY = currentY - touchStartRef.current.y;
+
+        // If vertical scroll is significant, cancel everything and don't track horizontal
+        if (Math.abs(diffY) > Math.abs(diffX) && Math.abs(diffY) > 5) {
+            if (longPressTimerRef.current) {
+                clearTimeout(longPressTimerRef.current);
+                longPressTimerRef.current = null;
+            }
+            return;
+        }
 
         // Cancel Long Press if moved
-        if (Math.abs(diffX) > 10) {
+        if (Math.abs(diffX) > 10 || Math.abs(diffY) > 10) {
             if (longPressTimerRef.current) {
                 clearTimeout(longPressTimerRef.current);
                 longPressTimerRef.current = null;
@@ -208,7 +222,9 @@ const MessageBubble: React.FC<MessageProps> = ({ message, onSwipeReply, onReact,
         }
 
         // Only allow swiping right (positive diff) and clamp it
-        if (diffX > 0 && diffX < 100) {
+        // Add a small deadzone of 10px before starting visual swipe to allow clean vertical scroll start
+        if (diffX > 10 && diffX < 100) {
+            // Prevent default only if we are sure it's a swipe (handled via CSS touch-action mostly)
             setSwipeOffset(diffX);
         }
     };
@@ -250,7 +266,7 @@ const MessageBubble: React.FC<MessageProps> = ({ message, onSwipeReply, onReact,
 
     return (
         <div
-            className={cn("flex w-full mb-2 group relative items-center", isMe ? "justify-end" : "justify-start")}
+            className={cn("flex w-full mb-2 group relative items-center touch-pan-y", isMe ? "justify-end" : "justify-start")}
             onDoubleClick={() => onReact && onReact(message.id, '❤️')}
             onContextMenu={(e) => {
                 e.preventDefault();
@@ -280,17 +296,17 @@ const MessageBubble: React.FC<MessageProps> = ({ message, onSwipeReply, onReact,
                 <>
                     <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)} />
                     <div className={cn(
-                        "absolute top-8 z-50 bg-white rounded-xl shadow-xl w-32 py-2 overflow-hidden border border-gray-100 animate-in fade-in zoom-in duration-200 origin-top-left",
+                        "absolute top-8 z-50 bg-white dark:bg-gray-800 rounded-xl shadow-xl w-40 py-2 overflow-hidden border border-gray-100 dark:border-gray-700 animate-in fade-in zoom-in duration-200 origin-top-left",
                         isMe ? "right-0" : "left-0"
                     )}>
-                        <button onClick={() => { onPin && onPin(message); setShowMenu(false); }} className="w-full text-left px-4 py-2 hover:bg-gray-50 text-sm font-medium">
+                        <button onClick={() => { onPin && onPin(message); setShowMenu(false); }} className="w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 text-sm font-bold text-gray-700 dark:text-gray-200">
                             {message.isPinned ? "Unpin Message" : "Pin Message"}
                         </button>
                         {isMe && message.type === 'text' && (
-                            <button onClick={() => { setIsEditing(true); setShowMenu(false); }} className="w-full text-left px-4 py-2 hover:bg-gray-50 text-sm font-medium">Edit</button>
+                            <button onClick={() => { setIsEditing(true); setShowMenu(false); }} className="w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 text-sm font-bold text-gray-700 dark:text-gray-200">Edit</button>
                         )}
-                        <button onClick={() => { onForward && onForward(message); setShowMenu(false); }} className="w-full text-left px-4 py-2 hover:bg-gray-50 text-sm font-medium">Forward</button>
-                        <button onClick={() => { onSaveToBag && onSaveToBag(message); setShowMenu(false); }} className="w-full text-left px-4 py-2 hover:bg-gray-50 text-sm font-medium flex items-center gap-2">
+                        <button onClick={() => { onForward && onForward(message); setShowMenu(false); }} className="w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 text-sm font-bold text-gray-700 dark:text-gray-200">Forward</button>
+                        <button onClick={() => { onSaveToBag && onSaveToBag(message); setShowMenu(false); }} className="w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 text-sm font-bold text-gray-700 dark:text-gray-200 flex items-center gap-2">
                             Save to Bag
                         </button>
                         {message.type === 'text' && (
@@ -300,13 +316,13 @@ const MessageBubble: React.FC<MessageProps> = ({ message, onSwipeReply, onReact,
                                     setShowMenu(false);
                                     /* Optional: Show toast */
                                 }}
-                                className="w-full text-left px-4 py-2 hover:bg-gray-50 text-sm font-medium"
+                                className="w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 text-sm font-bold text-gray-700 dark:text-gray-200"
                             >
                                 Copy Text
                             </button>
                         )}
                         {isMe && (
-                            <button onClick={() => { onDelete && onDelete(message.id); setShowMenu(false); }} className="w-full text-left px-4 py-2 hover:bg-red-50 text-red-500 text-sm font-medium">Delete</button>
+                            <button onClick={() => { onDelete && onDelete(message.id); setShowMenu(false); }} className="w-full text-left px-4 py-3 hover:bg-red-50 dark:hover:bg-red-900/20 text-red-500 text-sm font-bold">Delete</button>
                         )}
                     </div>
                 </>

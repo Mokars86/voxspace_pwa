@@ -36,6 +36,35 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSend, onTyping, onRecording, re
     const audioChunks = useRef<Blob[]>([]);
     const timerRef = useRef<any>(null);
 
+    const onContactPickerClick = async () => {
+        setShowAttachMenu(false);
+
+        // Native Contact Picker
+        if ('contacts' in navigator && 'ContactsManager' in window) {
+            try {
+                // @ts-ignore
+                const contacts = await navigator.contacts.select(['name', 'tel'], { multiple: false });
+
+                if (contacts && contacts.length > 0) {
+                    const contact = contacts[0];
+                    const name = contact.name ? contact.name[0] : 'Unknown';
+                    const phone = contact.tel ? contact.tel[0] : '';
+
+                    if (name && phone) {
+                        onSend(`Contact: ${name}`, 'contact', undefined, undefined, { name, phone });
+                    } else {
+                        alert("Selected contact missing name or phone number.");
+                    }
+                }
+            } catch (err) {
+                console.error("Contact picker failed or cancelled", err);
+                setShowContactModal(true);
+            }
+        } else {
+            setShowContactModal(true);
+        }
+    };
+
     // File Inputs
     const fileInputRef = useRef<HTMLInputElement>(null);
     const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -209,6 +238,8 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSend, onTyping, onRecording, re
             alert("Please enter both name and phone number.");
         }
     };
+
+
 
     return (
         <div className="flex flex-col w-full max-w-full">
@@ -386,7 +417,7 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSend, onTyping, onRecording, re
                                     </div>
                                     <span className="text-xs font-medium dark:text-gray-300">Buzz</span>
                                 </button>
-                                <button type="button" onClick={() => { setShowContactModal(true); setShowAttachMenu(false); }} className="flex flex-col items-center gap-1 p-2 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-xl transition-colors">
+                                <button type="button" onClick={onContactPickerClick} className="flex flex-col items-center gap-1 p-2 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-xl transition-colors">
                                     <div className="w-10 h-10 rounded-full bg-teal-100 text-teal-500 flex items-center justify-center"><User size={20} /></div>
                                     <span className="text-xs font-medium dark:text-gray-300">Contact</span>
                                 </button>
