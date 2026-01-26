@@ -254,7 +254,7 @@ const UserProfile: React.FC = () => {
             </div>
 
             <div className="px-4 pb-4 relative">
-                <div className="flex justify-between items-end -mt-10 mb-4">
+                <div className="flex justify-between items-end mt-4 mb-4">
                     <button
                         onClick={() => profile.avatar_url && setPreviewImage(profile.avatar_url)}
                         className={`relative rounded-full ${profile.avatar_url ? 'cursor-pointer' : 'cursor-default'}`}

@@ -183,7 +183,7 @@ const ProfileView: React.FC = () => {
 
       {/* Profile Info */}
       <div className="px-4 pb-4 relative">
-        <div className="flex justify-between items-end -mt-10 mb-4">
+        <div className="flex justify-between items-end mt-4 mb-4">
           <button
             onClick={() => displayProfile.avatar_url && setPreviewImage(displayProfile.avatar_url)}
             className={`relative rounded-full ${displayProfile.avatar_url ? 'cursor-pointer' : 'cursor-default'}`}
