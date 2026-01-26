@@ -19,7 +19,7 @@ import ProfileView from '../components/ProfileView';
 import CreateModal from '../components/CreateModal';
 import { useLanguage } from '../context/LanguageContext';
 import { useNotifications } from '../context/NotificationContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../services/supabase';
 
 import { PWAInstallPrompt } from '../components/PWAInstallPrompt';
@@ -28,9 +28,31 @@ const MainApp: React.FC = () => {
     const { t } = useLanguage();
     const { unreadCount: globalUnreadCount, notifications, markAsRead, markAllAsRead } = useNotifications();
     const navigate = useNavigate();
-    const [activeTab, setActiveTab] = useState<TabType>('feed');
+    const location = useLocation();
+
+    // Determine initial tab from URL or default to feed
+    const getTabFromPath = () => {
+        // Robust path parsing: handle leading/trailing slashes
+        const parts = location.pathname.split('/').filter(p => p.length > 0);
+        const path = parts[0] || 'feed';
+
+        if (['feed', 'chats', 'spaces', 'discover', 'profile'].includes(path)) {
+            return path as TabType;
+        }
+        return 'feed';
+    };
+
+    const [activeTab, setActiveTab] = useState<TabType>(getTabFromPath());
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [showNotifications, setShowNotifications] = useState(false);
+
+    // Sync Tab with URL Path Changes (e.g. back button)
+    useEffect(() => {
+        const tab = getTabFromPath();
+        if (tab !== activeTab) {
+            setActiveTab(tab);
+        }
+    }, [location.pathname]);
 
     // -- Badge State --
     const [newPostCount, setNewPostCount] = useState(0);
@@ -75,6 +97,9 @@ const MainApp: React.FC = () => {
     // 3. Handle Tab Change (Clear Badges)
     const handleTabChange = (tab: TabType) => {
         setActiveTab(tab);
+        // Navigate to update URL
+        navigate(tab === 'feed' ? '/' : `/${tab}`);
+
         if (tab === 'feed') {
             const now = new Date().toISOString();
             setLastViewedFeed(now);

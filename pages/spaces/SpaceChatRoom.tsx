@@ -270,7 +270,7 @@ export const SpaceChatRoomContent: React.FC = () => {
             {/* Header */}
             <div className="bg-white p-4 flex items-center justify-between shadow-sm sticky top-0 z-10">
                 <div className="flex items-center gap-3">
-                    <button onClick={() => navigate(-1)} className="p-2 hover:bg-gray-100 rounded-full text-gray-600">
+                    <button onClick={() => navigate(`/space/${id}`)} className="p-2 hover:bg-gray-100 rounded-full text-gray-600">
                         <ArrowLeft size={24} />
                     </button>
                     <div>

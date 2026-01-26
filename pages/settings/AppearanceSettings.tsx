@@ -41,6 +41,9 @@ const AppearanceSettings: React.FC = () => {
                 {/* Font Size Selection */}
                 <FontSizeSection />
 
+                {/* Bubble Color Selection */}
+                <BubbleColorSection />
+
                 {/* Chat Wallpaper Selection */}
                 <WallpaperSection />
             </div>
@@ -83,6 +86,42 @@ const FontSizeSection = () => {
                         Preview text size
                     </p>
                 </div>
+            </div>
+        </section>
+    );
+};
+
+const BubbleColorSection = () => {
+    const { bubbleColor, setBubbleColor } = useTheme();
+
+    const colors = [
+        { name: 'Red', value: '#ff1744' },
+        { name: 'Blue', value: '#3b82f6' },
+        { name: 'Green', value: '#22c55e' },
+        { name: 'Purple', value: '#a855f7' },
+        { name: 'Orange', value: '#f97316' },
+        { name: 'Pink', value: '#ec4899' },
+        { name: 'Teal', value: '#14b8a6' },
+        { name: 'Indigo', value: '#6366f1' },
+    ];
+
+    return (
+        <section>
+            <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-wider mb-4 ml-1">Bubble Color</h3>
+            <div className="grid grid-cols-4 gap-3">
+                {colors.map((c) => (
+                    <button
+                        key={c.name}
+                        onClick={() => setBubbleColor(c.value)}
+                        className={`aspect-square rounded-full transition-all duration-200 relative overflow-hidden flex items-center justify-center ${bubbleColor === c.value ? 'ring-4 ring-offset-2 ring-primary/20 scale-110' : 'hover:scale-105'
+                            }`}
+                        style={{ background: c.value }}
+                    >
+                        {bubbleColor === c.value && (
+                            <div className="w-4 h-4 rounded-full bg-white shadow-sm" />
+                        )}
+                    </button>
+                ))}
             </div>
         </section>
     );

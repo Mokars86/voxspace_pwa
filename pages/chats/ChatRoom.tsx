@@ -985,7 +985,7 @@ const ChatRoom = () => {
                     {/* Header */}
                     <header className="px-2 py-3 bg-white dark:bg-gray-900 flex items-center justify-between shadow-sm z-50 border-b border-gray-100 dark:border-gray-800 absolute top-0 w-full">
                         <div className="flex items-center gap-2">
-                            <button onClick={() => navigate(-1)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full">
+                            <button onClick={() => navigate('/chats')} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full">
                                 <ArrowLeft size={20} className="text-gray-600 dark:text-gray-300" />
                             </button>
                             {/* Avatar and Name */}

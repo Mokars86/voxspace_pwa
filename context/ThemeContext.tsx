@@ -16,6 +16,8 @@ interface ThemeProviderState {
     setFontSize: (size: FontSize) => void;
     chatWallpaper: string;
     setChatWallpaper: (wallpaper: string) => void;
+    bubbleColor: string;
+    setBubbleColor: (color: string) => void;
 }
 
 const initialState: ThemeProviderState = {
@@ -25,6 +27,8 @@ const initialState: ThemeProviderState = {
     setFontSize: () => null,
     chatWallpaper: '#e5ddd5', // Default WhatsApp/Standard like color
     setChatWallpaper: () => null,
+    bubbleColor: '#ff1744',
+    setBubbleColor: () => null,
 };
 
 const ThemeProviderContext = createContext<ThemeProviderState>(initialState);
@@ -45,6 +49,10 @@ export function ThemeProvider({
 
     const [chatWallpaper, setChatWallpaper] = useState<string>(() => {
         return localStorage.getItem(`${storageKey}-wallpaper`) || '#e5ddd5';
+    });
+
+    const [bubbleColor, setBubbleColor] = useState<string>(() => {
+        return localStorage.getItem(`${storageKey}-bubble-color`) || '#ff1744';
     });
 
     useEffect(() => {
@@ -86,8 +94,13 @@ export function ThemeProvider({
         setChatWallpaper: (w: string) => {
             localStorage.setItem(`${storageKey}-wallpaper`, w);
             setChatWallpaper(w);
+        },
+        bubbleColor,
+        setBubbleColor: (c: string) => {
+            localStorage.setItem(`${storageKey}-bubble-color`, c);
+            setBubbleColor(c);
         }
-    }), [mode, fontSize, chatWallpaper, storageKey]);
+    }), [mode, fontSize, chatWallpaper, bubbleColor, storageKey]);
 
     return (
         <ThemeProviderContext.Provider value={value}>

@@ -281,6 +281,8 @@ const SpaceDetail: React.FC = () => {
         if (data) setEvents(data);
     };
 
+    const [memberStatus, setMemberStatus] = useState<'pending' | 'approved' | null>(null);
+
     useEffect(() => {
         const fetchSpace = async () => {
             if (!id) return;
@@ -301,12 +303,18 @@ const SpaceDetail: React.FC = () => {
                 if (user) {
                     const { data: memberData } = await supabase
                         .from('space_members')
-                        .select('user_id')
+                        .select('status')
                         .eq('space_id', id)
                         .eq('user_id', user.id)
                         .single();
 
-                    setIsMember(!!memberData);
+                    if (memberData) {
+                        setIsMember(memberData.status === 'approved');
+                        setMemberStatus(memberData.status);
+                    } else {
+                        setIsMember(false);
+                        setMemberStatus(null);
+                    }
                 }
 
                 // Initial Fetch
@@ -322,7 +330,7 @@ const SpaceDetail: React.FC = () => {
 
         fetchSpace();
 
-        // Real-time Subscription for Posts
+        // ... (rest of useEffect logic for posts subscription)
         const channel = supabase
             .channel(`space_posts:${id}`)
             .on('postgres_changes', {
@@ -331,7 +339,7 @@ const SpaceDetail: React.FC = () => {
                 table: 'posts',
                 filter: `space_id=eq.${id}`
             }, async (payload) => {
-                // Fetch the full post details (including author)
+                // ... (handling payload)
                 const { data, error } = await supabase
                     .from('posts')
                     .select(`*, profiles:user_id(full_name, username, avatar_url, is_verified), post_likes(user_id)`)
@@ -339,6 +347,7 @@ const SpaceDetail: React.FC = () => {
                     .single();
 
                 if (!error && data) {
+                    // ... (construction newPost)
                     const newPost: Post = {
                         id: data.id,
                         author: {
@@ -359,14 +368,6 @@ const SpaceDetail: React.FC = () => {
                     };
 
                     setPosts(prev => {
-                        // Check if we already have this post (e.g. from optimistic update)
-                        // This might replace an optimistic post with the real one if IDs match or if logic handles it.
-                        // Since optimistic uses 'temp-', we should keep it until we confirm... 
-                        // Actually, if we just prepend, we might have duplicates if we don't manage the temp ID.
-                        // But usually the real ID comes later. 
-                        // Implementation strategy: Just prepend. Optimistic post logic usually needs to be replaced 
-                        // but here handlePostSubmit fetches after insert which refreshes the list anyway. 
-                        // But for OTHER users, this is critical.
                         if (prev.some(p => p.id === newPost.id)) return prev;
                         return [newPost, ...prev];
                     });
@@ -379,28 +380,39 @@ const SpaceDetail: React.FC = () => {
         };
     }, [id, user]);
 
+
     const handleJoinLeave = async () => {
         if (!user || !space) return;
         setJoinLoading(true);
         try {
-            if (isMember) {
-                // Leave Space
+            if (memberStatus) {
+                // Leave Space (or Cancel Request)
                 const { error } = await supabase
                     .from('space_members')
                     .delete()
                     .eq('space_id', id)
                     .eq('user_id', user.id);
                 if (error) throw error;
+
                 setIsMember(false);
-                setSpace((prev: any) => ({ ...prev, members_count: Math.max(0, prev.members_count - 1) }));
+                setMemberStatus(null);
+
+                // Only decrement if they were actually a member (approved)
+                if (memberStatus === 'approved') {
+                    setSpace((prev: any) => ({ ...prev, members_count: Math.max(0, prev.members_count - 1) }));
+                }
             } else {
-                // Join Space
+                // Join Request
+                // Note: RLS will handle 'pending' default, but we can be explicit if we want
                 const { error } = await supabase
                     .from('space_members')
                     .insert({ space_id: id, user_id: user.id });
                 if (error) throw error;
-                setIsMember(true);
-                setSpace((prev: any) => ({ ...prev, members_count: prev.members_count + 1 }));
+
+                // Status is pending by default (from DB or RLS)
+                setMemberStatus('pending');
+                setIsMember(false);
+                alert("Request sent! An admin must approve your request.");
             }
         } catch (error) {
             console.error("Error joining/leaving space:", error);
@@ -548,7 +560,7 @@ const SpaceDetail: React.FC = () => {
                         </div>
                     </div>
 
-                    {isOwner && (
+                    {isOwner ? (
                         <div className="flex gap-2">
                             {isEditing ? (
                                 <>
@@ -561,6 +573,22 @@ const SpaceDetail: React.FC = () => {
                                 </button>
                             )}
                         </div>
+                    ) : (
+                        <button
+                            onClick={handleJoinLeave}
+                            disabled={joinLoading}
+                            className={cn(
+                                "px-6 py-2 rounded-full font-bold shadow-lg transition-all active:scale-95 disabled:opacity-50",
+                                isMember
+                                    ? "bg-white/20 hover:bg-white/30 text-white backdrop-blur-md"
+                                    : memberStatus === 'pending'
+                                        ? "bg-yellow-500/80 hover:bg-yellow-600 text-white backdrop-blur-md"
+                                        : "bg-[#ff1744] hover:bg-red-600 text-white"
+                            )}
+                        >
+                            {joinLoading ? <Loader2 className="animate-spin" size={20} /> :
+                                (isMember ? "Joined" : memberStatus === 'pending' ? "Request Sent" : "Join Space")}
+                        </button>
                     )}
                 </div>
             </div>
@@ -611,11 +639,11 @@ const SpaceDetail: React.FC = () => {
                                 <div className="flex-1 space-y-3">
                                     <input
                                         type="text"
-                                        placeholder={isRecording ? "Recording audio..." : "Post something to the space..."}
-                                        className="w-full bg-gray-50 dark:bg-gray-700 dark:text-white rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#ff1744] outline-none"
+                                        placeholder={!isMember ? "Join the space to post..." : memberStatus === 'pending' ? "Waiting for approval..." : isRecording ? "Recording audio..." : "Post something to the space..."}
+                                        className="w-full bg-gray-50 dark:bg-gray-700 dark:text-white rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#ff1744] outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                                         value={newPostContent}
                                         onChange={(e) => setNewPostContent(e.target.value)}
-                                        disabled={isRecording}
+                                        disabled={isRecording || !isMember || memberStatus === 'pending'}
                                     />
 
                                     {/* Media Previews */}
@@ -653,8 +681,8 @@ const SpaceDetail: React.FC = () => {
                                     {/* Image Upload */}
                                     <button
                                         onClick={() => postFileInputRef.current?.click()}
-                                        className="hover:text-[#ff1744] cursor-pointer transition-colors p-1 rounded-full hover:bg-red-50"
-                                        disabled={isRecording || uploading}
+                                        className="hover:text-[#ff1744] cursor-pointer transition-colors p-1 rounded-full hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                                        disabled={isRecording || uploading || !isMember || memberStatus === 'pending'}
                                     >
                                         <ImageIcon size={20} />
                                     </button>
@@ -680,8 +708,8 @@ const SpaceDetail: React.FC = () => {
                                     ) : (
                                         <button
                                             onClick={handleStartRecording}
-                                            className="hover:text-[#ff1744] cursor-pointer transition-colors p-1 rounded-full hover:bg-red-50"
-                                            disabled={!!postMedia || uploading}
+                                            className="hover:text-[#ff1744] cursor-pointer transition-colors p-1 rounded-full hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                                            disabled={!!postMedia || uploading || !isMember || memberStatus === 'pending'}
                                         >
                                             <Mic size={20} />
                                         </button>
@@ -690,7 +718,7 @@ const SpaceDetail: React.FC = () => {
 
                                 <button
                                     onClick={handlePostSubmit}
-                                    disabled={(!newPostContent.trim() && !postMedia) || uploading || isRecording}
+                                    disabled={(!newPostContent.trim() && !postMedia) || uploading || isRecording || !isMember || memberStatus === 'pending'}
                                     className="px-5 py-1.5 bg-[#ff1744] hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-bold rounded-full transition-all shadow-md active:scale-95 flex items-center gap-2"
                                 >
                                     {uploading && <Loader2 size={14} className="animate-spin" />}

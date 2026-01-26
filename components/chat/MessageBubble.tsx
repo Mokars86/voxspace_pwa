@@ -1,6 +1,7 @@
 import React from 'react';
 import { cn } from '../../lib/utils';
 import { Check, CheckCheck, Play, Pause, File as FileIcon, MapPin, Music, Timer, EyeOff, Lock, Video, Reply, ShoppingBag, Download } from 'lucide-react';
+import { useTheme } from '../../context/ThemeContext';
 
 export interface ChatMessage {
     id: string;
@@ -41,6 +42,7 @@ export interface MessageProps {
 }
 
 const AudioPlayer = ({ url, isMe, duration: initialDuration, type }: { url: string, isMe: boolean, duration?: number | string, type: string }) => {
+    const { bubbleColor } = useTheme();
     const [isPlaying, setIsPlaying] = React.useState(false);
     const [currentTime, setCurrentTime] = React.useState(0);
     const [duration, setDuration] = React.useState(0);
@@ -105,8 +107,12 @@ const AudioPlayer = ({ url, isMe, duration: initialDuration, type }: { url: stri
                 onClick={(e) => { e.stopPropagation(); togglePlay(); }}
                 className={cn(
                     "w-10 h-10 rounded-full flex items-center justify-center shrink-0 shadow-sm transition-transform active:scale-95",
-                    isMe ? "bg-white text-[#ff1744]" : "bg-[#ff1744] text-white"
+                    isMe ? "" : "text-white"
                 )}
+                style={{
+                    backgroundColor: isMe ? 'white' : bubbleColor,
+                    color: isMe ? bubbleColor : 'white'
+                }}
             >
                 {isPlaying ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" className="ml-1" />}
             </button>
@@ -127,11 +133,13 @@ const AudioPlayer = ({ url, isMe, duration: initialDuration, type }: { url: stri
                                 key={i}
                                 className={cn(
                                     "w-1 rounded-full transition-all duration-100",
-                                    isMe
-                                        ? (isPlayed ? "bg-white opacity-100" : "bg-white opacity-40")
-                                        : (isPlayed ? "bg-[#ff1744] opacity-100" : "bg-gray-300 dark:bg-gray-600")
                                 )}
-                                style={{ height: height }}
+                                style={{
+                                    height: height,
+                                    backgroundColor: isMe
+                                        ? (isPlayed ? "white" : "rgba(255,255,255,0.4)")
+                                        : (isPlayed ? bubbleColor : "rgb(209 213 219)") // gray-300 equivalent
+                                }}
                             />
                         );
                     })}
@@ -171,6 +179,7 @@ const AudioPlayer = ({ url, isMe, duration: initialDuration, type }: { url: stri
 };
 
 const MessageBubble: React.FC<MessageProps> = ({ message, onSwipeReply, onReact, onLongPress, onEdit, onDelete, onForward, onMediaClick, onViewOnce, onPin, onSaveToBag }) => {
+    const { bubbleColor } = useTheme();
     const isMe = message.sender === 'me';
     const [isPlaying, setIsPlaying] = React.useState(false);
     const [showMenu, setShowMenu] = React.useState(false);
@@ -285,7 +294,10 @@ const MessageBubble: React.FC<MessageProps> = ({ message, onSwipeReply, onReact,
                     transform: `translateX(${Math.min(swipeOffset / 2, 20)}px) scale(${Math.min(swipeOffset / SWIPE_THRESHOLD, 1)})`
                 }}
             >
-                <div className={cn("p-1.5 rounded-full", swipeOffset > SWIPE_THRESHOLD ? "bg-gray-200 text-[#ff1744]" : "")}>
+                <div
+                    className={cn("p-1.5 rounded-full", swipeOffset > SWIPE_THRESHOLD ? "bg-gray-200" : "")}
+                    style={{ color: swipeOffset > SWIPE_THRESHOLD ? bubbleColor : undefined }}
+                >
                     <Reply size={20} />
                 </div>
             </div>
@@ -332,10 +344,13 @@ const MessageBubble: React.FC<MessageProps> = ({ message, onSwipeReply, onReact,
                 className={cn(
                     "relative max-w-[75%] rounded-2xl shadow-sm transition-transform duration-75 overflow-hidden",
                     isMe
-                        ? "bg-[#ff1744] text-white rounded-tr-none"
+                        ? "text-white rounded-tr-none"
                         : "bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-tl-none"
                 )}
-                style={{ transform: `translateX(${swipeOffset}px)` }}
+                style={{
+                    transform: `translateX(${swipeOffset}px)`,
+                    backgroundColor: isMe ? bubbleColor : undefined
+                }}
             >
                 {/* Reply Context */}
                 {message.replyTo && (
@@ -511,7 +526,7 @@ const MessageBubble: React.FC<MessageProps> = ({ message, onSwipeReply, onReact,
                     {message.type === 'location' && message.metadata && (
                         <div className="flex flex-col gap-2 min-w-[200px]">
                             <div className="flex items-center gap-2 font-bold mb-1">
-                                <MapPin size={20} className="text-[#ff1744]" />
+                                <MapPin size={20} style={{ color: bubbleColor }} />
                                 <span>Location Shared</span>
                             </div>
                             <div className="h-32 bg-gray-200 dark:bg-gray-700 rounded-lg flex items-center justify-center relative overflow-hidden">
