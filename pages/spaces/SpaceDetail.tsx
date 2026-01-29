@@ -399,6 +399,32 @@ const SpaceDetail: React.FC = () => {
                     setSpace((prev: any) => ({ ...prev, members_count: Math.max(0, prev.members_count - 1) }));
                 }
             } else {
+                // Check Join Limit
+                const { count, error: countError } = await supabase
+                    .from('space_members')
+                    .select('*', { count: 'exact', head: true })
+                    .eq('user_id', user.id)
+                    .neq('status', 'rejected'); // Count pending and approved
+
+                if (countError) throw countError;
+
+                // Check User Badge
+                const { data: profileData, error: profileError } = await supabase
+                    .from('profiles')
+                    .select('badge_type')
+                    .eq('id', user.id)
+                    .single();
+
+                if (profileError) throw profileError;
+
+                const hasUnlimitedAccess = profileData?.badge_type === 'premium' || profileData?.badge_type === 'founder';
+
+                if ((count || 0) >= 4 && !hasUnlimitedAccess) {
+                    alert("You have reached the limit of 4 joined spaces. Upgrade to Premium to join more!");
+                    setJoinLoading(false);
+                    return;
+                }
+
                 // Join Request
                 // Note: RLS will handle 'pending' default, but we can be explicit if we want
                 const { error } = await supabase
@@ -902,48 +928,48 @@ const SpaceDetail: React.FC = () => {
             {/* Event Creation Modal */}
             {showEventModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-                    <div className="bg-white rounded-2xl w-full max-w-md overflow-hidden shadow-xl animate-in zoom-in-95 duration-200">
-                        <div className="p-4 border-b border-gray-100 flex justify-between items-center">
-                            <h3 className="text-lg font-bold">Create Event</h3>
+                    <div className="bg-white dark:bg-gray-900 rounded-2xl w-full max-w-md overflow-hidden shadow-xl animate-in zoom-in-95 duration-200">
+                        <div className="p-4 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center">
+                            <h3 className="text-lg font-bold dark:text-white">Create Event</h3>
                             <button onClick={() => setShowEventModal(false)} className="text-gray-400 hover:text-gray-600"><X size={24} /></button>
                         </div>
                         <div className="p-4 space-y-4">
                             <div>
-                                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Event Title</label>
+                                <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-1">Event Title</label>
                                 <input
                                     type="text"
                                     value={newEvent.title}
                                     onChange={e => setNewEvent({ ...newEvent, title: e.target.value })}
-                                    className="w-full bg-gray-50 rounded-xl px-4 py-2 text-sm border border-gray-200 outline-none focus:border-[#ff1744]"
+                                    className="w-full bg-gray-50 dark:bg-gray-800 dark:text-white dark:border-gray-700 rounded-xl px-4 py-2 text-sm border border-gray-200 outline-none focus:border-[#ff1744]"
                                     placeholder="e.g. Weekly Meetup"
                                 />
                             </div>
                             <div>
-                                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Description</label>
+                                <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-1">Description</label>
                                 <textarea
                                     value={newEvent.description}
                                     onChange={e => setNewEvent({ ...newEvent, description: e.target.value })}
-                                    className="w-full bg-gray-50 rounded-xl px-4 py-2 text-sm border border-gray-200 outline-none focus:border-[#ff1744] h-24 resize-none"
+                                    className="w-full bg-gray-50 dark:bg-gray-800 dark:text-white dark:border-gray-700 rounded-xl px-4 py-2 text-sm border border-gray-200 outline-none focus:border-[#ff1744] h-24 resize-none"
                                     placeholder="What is this event about?"
                                 />
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Start Time</label>
+                                    <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-1">Start Time</label>
                                     <input
                                         type="datetime-local"
                                         value={newEvent.start_time}
                                         onChange={e => setNewEvent({ ...newEvent, start_time: e.target.value })}
-                                        className="w-full bg-gray-50 rounded-xl px-4 py-2 text-sm border border-gray-200 outline-none focus:border-[#ff1744]"
+                                        className="w-full bg-gray-50 dark:bg-gray-800 dark:text-white dark:border-gray-700 rounded-xl px-4 py-2 text-sm border border-gray-200 outline-none focus:border-[#ff1744] dark:calendar-invert"
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Location</label>
+                                    <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-1">Location</label>
                                     <input
                                         type="text"
                                         value={newEvent.location}
                                         onChange={e => setNewEvent({ ...newEvent, location: e.target.value })}
-                                        className="w-full bg-gray-50 rounded-xl px-4 py-2 text-sm border border-gray-200 outline-none focus:border-[#ff1744]"
+                                        className="w-full bg-gray-50 dark:bg-gray-800 dark:text-white dark:border-gray-700 rounded-xl px-4 py-2 text-sm border border-gray-200 outline-none focus:border-[#ff1744]"
                                         placeholder="Online or Address"
                                     />
                                 </div>
