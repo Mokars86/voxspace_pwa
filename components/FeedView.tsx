@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { PenLine, Image as ImageIcon, Video, Loader2, X, BarChart2, Plus, Minus } from 'lucide-react';
+import { PenLine, Image as ImageIcon, Video, Loader2, X, BarChart2, Plus, Minus, ChevronUp, ChevronDown } from 'lucide-react';
 import PostCard from './PostCard';
 import StoryBar from './StoryBar';
 import ImageViewer from './ImageViewer';
@@ -23,6 +23,7 @@ const FeedView: React.FC = () => {
   const [viewingImage, setViewingImage] = useState<{ url: string, type: 'image' | 'video' } | null>(null);
   const [isPollMode, setIsPollMode] = useState(false);
   const [pollOptions, setPollOptions] = useState<string[]>(['', '']);
+  const [showStories, setShowStories] = useState(true);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const fetchPosts = async () => {
@@ -31,11 +32,6 @@ const FeedView: React.FC = () => {
       let query = supabase
         .from('posts')
         .select(`
-            id,
-            content,
-            media_url,
-            media_type,
-            location,
             id,
             content,
             media_url,
@@ -51,7 +47,6 @@ const FeedView: React.FC = () => {
             profiles:user_id (
                 full_name,
                 username,
-                avatar_url,
                 avatar_url,
                 is_verified,
                 badge_type
@@ -272,8 +267,6 @@ const FeedView: React.FC = () => {
                     media_url,
                     media_type,
                     location,
-                    media_type,
-                    location,
                     created_at,
                     poll_options,
                     likes_count,
@@ -350,30 +343,43 @@ const FeedView: React.FC = () => {
   }, [activeTab, user]);
 
   return (
-    <div className="flex flex-col h-full bg-white dark:bg-gray-900 transition-colors">
+    <div className="flex flex-col h-full bg-background transition-colors">
       {/* Header Tabs */}
-      <div className="flex border-b border-gray-100 dark:border-gray-800 sticky top-0 bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm z-10 pt-2">
+      <div className="flex border-b border-border sticky top-0 bg-background/95 backdrop-blur-sm z-10 pt-2">
+
 
         <button
-          onClick={() => setActiveTab('foryou')}
-          className="flex-1 py-3 text-center relative"
+          onClick={() => {
+            if (activeTab === 'foryou') {
+              setShowStories(!showStories);
+            } else {
+              setActiveTab('foryou');
+              setShowStories(true);
+            }
+          }}
+          className="flex-1 py-3 text-center relative flex items-center justify-center gap-2"
         >
-          <span className={cn("font-bold text-[15px]", activeTab === 'foryou' ? "text-gray-900 dark:text-white" : "text-gray-500 dark:text-gray-400")}>
+          <span className={cn("font-bold text-[15px]", activeTab === 'foryou' ? "text-foreground" : "text-muted-foreground")}>
             {t('feed.tabs.foryou')}
           </span>
           {activeTab === 'foryou' && (
-            <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-14 h-1 bg-[#ff1744] rounded-full" />
+            <span className="text-muted-foreground/50 transition-transform duration-200">
+              {showStories ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+            </span>
+          )}
+          {activeTab === 'foryou' && (
+            <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-14 h-1 bg-primary rounded-full" />
           )}
         </button>
         <button
           onClick={() => setActiveTab('following')}
           className="flex-1 py-3 text-center relative"
         >
-          <span className={cn("font-bold text-[15px]", activeTab === 'following' ? "text-gray-900 dark:text-white" : "text-gray-500 dark:text-gray-400")}>
+          <span className={cn("font-bold text-[15px]", activeTab === 'following' ? "text-foreground" : "text-muted-foreground")}>
             {t('feed.tabs.following')}
           </span>
           {activeTab === 'following' && (
-            <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-14 h-1 bg-[#ff1744] rounded-full" />
+            <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-14 h-1 bg-primary rounded-full" />
           )}
         </button>
       </div>
@@ -381,15 +387,15 @@ const FeedView: React.FC = () => {
       {/* Stories - Visible on both tabs or just one? Usually visible on top of 'For You' or global. */}
       {/* WhatsApp Status style usually implies a separate tab, but here requested on feed. */}
       {/* Best place: Top of 'For You' list. */}
-      {activeTab === 'foryou' && (
-        <div className="border-b border-gray-50 dark:border-gray-800">
+      {activeTab === 'foryou' && showStories && (
+        <div className="border-b border-border animate-in slide-in-from-top-2 duration-300">
           <StoryBar />
         </div>
       )}
 
       {/* Followed Users List (Horizontal Scroll) - Only on Following Tab */}
       {activeTab === 'following' && followedUsers.length > 0 && (
-        <div className="px-4 py-3 border-b border-gray-50 overflow-x-auto whitespace-nowrap scrollbar-hide">
+        <div className="px-4 py-3 border-b border-border overflow-x-auto whitespace-nowrap scrollbar-hide">
           <div className="flex gap-4">
             {followedUsers.map((u: any) => (
               <div key={u.id} className="flex flex-col items-center gap-1 min-w-[64px]">
@@ -411,11 +417,11 @@ const FeedView: React.FC = () => {
 
       {/* Quick Create (Mini) - Only on For You */}
       {activeTab === 'foryou' && (
-        <div className="p-4 flex gap-3 border-b border-gray-50 dark:border-gray-800">
+        <div className="p-4 flex gap-3 border-b border-border">
           <img
             src={profile?.avatar_url || user?.user_metadata?.avatar_url || `https://ui-avatars.com/api/?name=${profile?.full_name || user?.user_metadata?.full_name || 'User'}&background=random`}
             alt="Profile"
-            className="w-10 h-10 rounded-full object-cover border border-gray-200 dark:border-gray-700"
+            className="w-10 h-10 rounded-full object-cover border border-border"
           />
           <div className="flex-1">
 
@@ -432,13 +438,13 @@ const FeedView: React.FC = () => {
                   }
                 }}
                 disabled={isPosting}
-                className="w-full py-2 bg-transparent outline-none text-lg placeholder:text-gray-500 dark:text-white dark:placeholder:text-gray-400"
+                className="w-full py-2 bg-transparent outline-none text-lg placeholder:text-muted-foreground text-foreground"
               />
               {newPostContent.trim() && (
                 <button
                   onClick={handleCreatePost}
                   disabled={isPosting}
-                  className="bg-[#ff1744] text-white px-4 py-1 rounded-full text-sm font-bold hover:bg-red-600 transition-colors disabled:opacity-50"
+                  className="bg-primary text-white px-4 py-1 rounded-full text-sm font-bold hover:bg-primary/90 transition-colors disabled:opacity-50"
                 >
                   {isPosting ? <Loader2 size={16} className="animate-spin" /> : 'Post'}
                 </button>
@@ -461,17 +467,17 @@ const FeedView: React.FC = () => {
               </div>
             )}
 
-            <div className="flex items-center gap-4 mt-2 text-[#ff1744]">
+            <div className="flex items-center gap-4 mt-2 text-primary">
               <button
                 onClick={() => fileInputRef.current?.click()}
-                className="hover:bg-red-50 dark:hover:bg-red-900/20 p-2 rounded-full transition-colors flex items-center gap-2"
+                className="hover:bg-primary/10 p-2 rounded-full transition-colors flex items-center gap-2"
                 title="Add Image or Video"
               >
                 <ImageIcon size={20} />
               </button>
               <button
                 onClick={() => fileInputRef.current?.click()}
-                className="hover:bg-red-50 dark:hover:bg-red-900/20 p-2 rounded-full transition-colors flex items-center gap-2"
+                className="hover:bg-primary/10 p-2 rounded-full transition-colors flex items-center gap-2"
                 title="Add Video"
               >
                 <Video size={20} />
@@ -483,7 +489,7 @@ const FeedView: React.FC = () => {
                     removeMedia(); // Polls usually exclusive with media in this design
                   }
                 }}
-                className={`hover:bg-red-50 dark:hover:bg-red-900/20 p-2 rounded-full transition-colors flex items-center gap-2 ${isPollMode ? 'bg-red-50 dark:bg-red-900/20' : ''}`}
+                className={`hover:bg-primary/10 p-2 rounded-full transition-colors flex items-center gap-2 ${isPollMode ? 'bg-primary/10' : ''}`}
                 title="Create Poll"
               >
                 <BarChart2 size={20} />
@@ -504,7 +510,7 @@ const FeedView: React.FC = () => {
                         newOptions[idx] = e.target.value;
                         setPollOptions(newOptions);
                       }}
-                      className="flex-1 bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-[#ff1744] transition-colors"
+                      className="flex-1 bg-input border border-input rounded-lg px-3 py-2 text-sm outline-none focus:border-primary transition-colors text-foreground"
                     />
                     {pollOptions.length > 2 && (
                       <button
@@ -519,7 +525,7 @@ const FeedView: React.FC = () => {
                 {pollOptions.length < 4 && (
                   <button
                     onClick={() => setPollOptions([...pollOptions, ''])}
-                    className="text-[#ff1744] text-sm font-medium hover:underline flex items-center gap-1"
+                    className="text-primary text-sm font-medium hover:underline flex items-center gap-1"
                   >
                     <Plus size={14} /> Add Option
                   </button>
@@ -542,7 +548,7 @@ const FeedView: React.FC = () => {
       <div className="flex-1 overflow-y-auto">
         {loading ? (
           <div className="flex py-12 justify-center">
-            <Loader2 className="animate-spin text-gray-300" />
+            <Loader2 className="animate-spin text-muted-foreground" />
           </div>
         ) : (
           posts.length > 0 ? (
@@ -556,7 +562,7 @@ const FeedView: React.FC = () => {
               />
             ))
           ) : (
-            <div className="p-8 text-center text-gray-500">
+            <div className="p-8 text-center text-muted-foreground">
               {activeTab === 'following'
                 ? (followedUsers.length > 0
                   ? <p>{t('feed.empty_following')}</p>

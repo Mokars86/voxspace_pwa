@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../context/AuthContext';
-import { ArrowLeft, MessageSquare, Calendar, Link as LinkIcon, Loader2, MoreVertical, Ban, ShieldAlert } from 'lucide-react';
+import { ArrowLeft, MessageSquare, Calendar, Link as LinkIcon, Loader2, MoreVertical, Ban, ShieldAlert, Settings } from 'lucide-react';
 import PostCard from '../components/PostCard';
 import { Post } from '../types';
 import ImageViewer from '../components/ImageViewer';
@@ -251,6 +251,14 @@ const UserProfile: React.FC = () => {
                         )}
                     </div>
                 )}
+                {isOwnProfile && (
+                     <button
+                        onClick={() => navigate('/settings')}
+                        className="absolute top-4 right-4 p-2 bg-black/20 rounded-full text-white backdrop-blur-sm hover:bg-black/30 transition-colors z-10"
+                    >
+                        <Settings size={20} />
+                    </button>
+                )}
             </div>
 
             <div className="px-4 pb-4 relative">
@@ -275,9 +283,7 @@ const UserProfile: React.FC = () => {
                     </button>
                     <div className="flex gap-2">
                         {isOwnProfile ? (
-                            <button onClick={() => navigate('/edit-profile')} className="px-4 py-1.5 border border-gray-300 rounded-full font-bold text-sm hover:bg-gray-50">
-                                Edit Profile
-                            </button>
+                            null
                         ) : (
                             <>
                                 <button

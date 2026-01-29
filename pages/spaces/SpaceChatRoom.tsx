@@ -319,7 +319,7 @@ export const SpaceChatRoomContent: React.FC = () => {
                                     </div>
                                 )}
 
-                                <div className={isMe ? "max-w-[85%]" : "max-w-[75%]"}>
+                                <div className="max-w-full">
                                     {!isMe && !isSequential && (
                                         <p className="text-[10px] text-gray-400 ml-1 mb-0.5">{msg.senderName}</p>
                                     )}

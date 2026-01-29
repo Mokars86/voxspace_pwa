@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Download, Trash2, FileText, ExternalLink } from 'lucide-react';
+import { X, Download, Trash2, FileText, ExternalLink, PenLine } from 'lucide-react';
 import { MyBagItem } from '../../types/mybag';
 
 interface BagItemPreviewModalProps {
@@ -8,9 +8,10 @@ interface BagItemPreviewModalProps {
     item: MyBagItem | null;
     onDownload: (item: MyBagItem) => void;
     onDelete: (item: MyBagItem) => void;
+    onEdit?: (item: MyBagItem) => void;
 }
 
-const BagItemPreviewModal: React.FC<BagItemPreviewModalProps> = ({ isOpen, onClose, item, onDownload, onDelete }) => {
+const BagItemPreviewModal: React.FC<BagItemPreviewModalProps> = ({ isOpen, onClose, item, onDownload, onDelete, onEdit }) => {
     if (!item) return null;
 
     const renderContent = () => {
@@ -77,6 +78,16 @@ const BagItemPreviewModal: React.FC<BagItemPreviewModalProps> = ({ isOpen, onClo
                             <Trash2 size={18} />
                             <span>Delete</span>
                         </button>
+
+                        {item.type === 'note' && (
+                            <button
+                                onClick={() => onEdit && onEdit(item)}
+                                className="flex items-center gap-2 px-4 py-2 bg-gray-200 dark:bg-gray-800 text-gray-900 dark:text-white hover:bg-gray-300 dark:hover:bg-gray-700 rounded-lg font-medium transition-colors"
+                            >
+                                <PenLine size={18} />
+                                <span>Edit</span>
+                            </button>
+                        )}
 
                         {(item.type === 'image' || item.type === 'video' || item.type === 'audio' || item.type === 'file') && (
                             <button

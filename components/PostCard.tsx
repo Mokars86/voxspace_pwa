@@ -316,7 +316,7 @@ const PostCard: React.FC<PostCardProps> = ({ post, onDelete, onPin, onMediaClick
 
 
     return (
-        <article className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50/50 dark:hover:bg-gray-800/20 transition-all cursor-pointer animate-in fade-in duration-300">
+        <article className="border-b border-border hover:bg-muted/50 transition-all cursor-pointer animate-in fade-in duration-300">
             {/* Repost Header */}
             {post.repostOf && (
                 <div className="flex items-center gap-2 px-4 pt-3 text-xs font-bold text-gray-500 mb-[-8px]">
@@ -334,11 +334,11 @@ const PostCard: React.FC<PostCardProps> = ({ post, onDelete, onPin, onMediaClick
                         navigate(`/user/${post.author.id}`);
                     }}
                 >
-                    <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden ring-2 ring-transparent hover:ring-[#ff1744] transition-all">
+                    <div className="w-10 h-10 rounded-full bg-muted overflow-hidden ring-2 ring-transparent hover:ring-primary transition-all">
                         {post.author.avatar ? (
                             <img src={post.author.avatar} alt={post.author.name} className="w-full h-full object-cover" />
                         ) : (
-                            <div className="w-full h-full flex items-center justify-center text-gray-400 font-bold text-sm">
+                            <div className="w-full h-full flex items-center justify-center text-muted-foreground font-bold text-sm">
                                 {post.author.name?.[0]}
                             </div>
                         )}
@@ -355,17 +355,17 @@ const PostCard: React.FC<PostCardProps> = ({ post, onDelete, onPin, onMediaClick
                     {/* Header */}
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-1 min-w-0" onClick={(e) => { e.stopPropagation(); navigate(`/user/${post.author.id}`); }}>
-                            <h3 className="font-bold text-gray-900 dark:text-white truncate hover:underline">{post.author.name}</h3>
+                            <h3 className="font-bold text-foreground truncate hover:underline">{post.author.name}</h3>
                             {/* REMOVED BadgeCheck from here to match Profile style */}
-                            <span className="text-gray-500 text-sm truncate">@{post.author.username}</span>
-                            <span className="text-gray-400 text-xs whitespace-nowrap">· {post.timestamp}</span>
-                            {post.is_pinned && <span className="text-xs text-[#ff1744] font-bold ml-2">📌 Pinned</span>}
+                            <span className="text-muted-foreground text-sm truncate">@{post.author.username}</span>
+                            <span className="text-muted-foreground text-xs whitespace-nowrap">· {post.timestamp}</span>
+                            {post.is_pinned && <span className="text-xs text-primary font-bold ml-2">📌 Pinned</span>}
                         </div>
 
                         <div className="relative">
                             <button
                                 onClick={(e) => { e.stopPropagation(); setMenuOpen(!menuOpen); }}
-                                className="p-1.5 text-gray-400 hover:text-[#ff1744] hover:bg-red-50 dark:hover:bg-red-900/20 rounded-full transition-colors"
+                                className="p-1.5 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-full transition-colors"
                             >
                                 <MoreHorizontal size={18} />
                             </button>
@@ -373,24 +373,24 @@ const PostCard: React.FC<PostCardProps> = ({ post, onDelete, onPin, onMediaClick
                             {menuOpen && (
                                 <>
                                     <div className="fixed inset-0 z-10" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); }} />
-                                    <div className="absolute right-0 top-8 z-20 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-100 dark:border-gray-700 w-48 overflow-hidden py-1 animate-in zoom-in-95 duration-100 origin-top-right">
+                                    <div className="absolute right-0 top-8 z-20 bg-popover rounded-xl shadow-xl border border-border w-48 overflow-hidden py-1 animate-in zoom-in-95 duration-100 origin-top-right text-popover-foreground">
                                         {isAuthor && (
                                             <>
-                                                <button onClick={(e) => { e.stopPropagation(); handleDelete(); }} className="w-full text-left px-4 py-2 text-sm text-red-500 hover:bg-red-50 font-medium flex items-center gap-2">
+                                                <button onClick={(e) => { e.stopPropagation(); handleDelete(); }} className="w-full text-left px-4 py-2 text-sm text-destructive hover:bg-muted font-medium flex items-center gap-2">
                                                     <Trash2 size={14} /> Delete
                                                 </button>
-                                                <button onClick={(e) => { e.stopPropagation(); setIsEditing(true); setMenuOpen(false); }} className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 font-medium flex items-center gap-2">
+                                                <button onClick={(e) => { e.stopPropagation(); setIsEditing(true); setMenuOpen(false); }} className="w-full text-left px-4 py-2 text-sm text-foreground hover:bg-muted font-medium flex items-center gap-2">
                                                     <Edit2 size={14} /> Edit
                                                 </button>
-                                                <button onClick={(e) => { e.stopPropagation(); onPin && onPin(post.id); setMenuOpen(false); }} className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 font-medium flex items-center gap-2">
+                                                <button onClick={(e) => { e.stopPropagation(); onPin && onPin(post.id); setMenuOpen(false); }} className="w-full text-left px-4 py-2 text-sm text-foreground hover:bg-muted font-medium flex items-center gap-2">
                                                     <MapPin size={14} /> {post.is_pinned ? 'Unpin' : 'Pin'}
                                                 </button>
                                             </>
                                         )}
-                                        <button className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 font-medium flex items-center gap-2">
+                                        <button className="w-full text-left px-4 py-2 text-sm text-foreground hover:bg-muted font-medium flex items-center gap-2">
                                             <Share size={14} /> Share
                                         </button>
-                                        <button onClick={(e) => { e.stopPropagation(); handleSaveToBag(); }} className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 font-medium flex items-center gap-2">
+                                        <button onClick={(e) => { e.stopPropagation(); handleSaveToBag(); }} className="w-full text-left px-4 py-2 text-sm text-foreground hover:bg-muted font-medium flex items-center gap-2">
                                             <Lock size={14} /> Save to My Bag
                                         </button>
                                         {post.media && (post.media_type === 'image' || !post.media_type) && (
@@ -400,7 +400,7 @@ const PostCard: React.FC<PostCardProps> = ({ post, onDelete, onPin, onMediaClick
                                                 onClick={(e) => e.stopPropagation()}
                                                 target="_blank"
                                                 rel="noopener noreferrer"
-                                                className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 font-medium flex items-center gap-2"
+                                                className="w-full text-left px-4 py-2 text-sm text-foreground hover:bg-muted font-medium flex items-center gap-2"
                                             >
                                                 <Download size={14} /> Download
                                             </a>
@@ -417,15 +417,15 @@ const PostCard: React.FC<PostCardProps> = ({ post, onDelete, onPin, onMediaClick
                             <textarea
                                 value={editContent}
                                 onChange={e => setEditContent(e.target.value)}
-                                className="w-full p-2 border rounded-lg bg-gray-50 dark:bg-gray-800 dark:text-white"
+                                className="w-full p-2 border border-border rounded-lg bg-input text-foreground"
                             />
                             <div className="flex justify-end gap-2 mt-2">
-                                <button onClick={() => setIsEditing(false)} className="px-3 py-1 text-sm rounded-lg hover:bg-gray-100">Cancel</button>
-                                <button onClick={handleSaveEdit} className="px-3 py-1 text-sm bg-[#ff1744] text-white rounded-lg">Save</button>
+                                <button onClick={() => setIsEditing(false)} className="px-3 py-1 text-sm rounded-lg hover:bg-muted text-muted-foreground">Cancel</button>
+                                <button onClick={handleSaveEdit} className="px-3 py-1 text-sm bg-primary text-primary-foreground rounded-lg">Save</button>
                             </div>
                         </div>
                     ) : (
-                        <p className="mt-1 text-[15px] text-gray-900 dark:text-gray-100 leading-relaxed whitespace-pre-wrap break-words">
+                        <p className="mt-1 text-[15px] text-foreground leading-relaxed whitespace-pre-wrap break-words">
                             {displayContent}
                         </p>
                     )}
@@ -524,7 +524,7 @@ const PostCard: React.FC<PostCardProps> = ({ post, onDelete, onPin, onMediaClick
                     )}
 
                     {/* Actions Bar */}
-                    <div className="flex items-center justify-between mt-3 max-w-md text-gray-500 dark:text-gray-400">
+                    <div className="flex items-center justify-between mt-3 max-w-md text-muted-foreground">
                         <button
                             onClick={(e) => {
                                 e.stopPropagation();
@@ -532,7 +532,7 @@ const PostCard: React.FC<PostCardProps> = ({ post, onDelete, onPin, onMediaClick
                             }}
                             className="flex items-center gap-2 group hover:text-blue-500 transition-colors text-sm"
                         >
-                            <div className="p-2 rounded-full group-hover:bg-blue-50 dark:group-hover:bg-blue-900/30 transition-colors">
+                            <div className="p-2 rounded-full group-hover:bg-blue-500/10 transition-colors">
                                 <MessageCircle size={18} className={cn(showComments && "fill-current")} />
                             </div>
                             <span>{commentCount}</span>
@@ -545,7 +545,7 @@ const PostCard: React.FC<PostCardProps> = ({ post, onDelete, onPin, onMediaClick
                             }}
                             className={cn("flex items-center gap-2 group hover:text-green-500 transition-colors text-sm", post.reposts > 0 && "text-green-500")}
                         >
-                            <div className="p-2 rounded-full group-hover:bg-green-50 dark:group-hover:bg-green-900/30 transition-colors">
+                            <div className="p-2 rounded-full group-hover:bg-green-500/10 transition-colors">
                                 <Repeat size={18} />
                             </div>
                             <span>{repostCount}</span>
@@ -557,10 +557,10 @@ const PostCard: React.FC<PostCardProps> = ({ post, onDelete, onPin, onMediaClick
                             }}
                             className={cn(
                                 "flex items-center gap-2 group transition-colors text-sm",
-                                liked ? "text-[#ff1744]" : "hover:text-[#ff1744]"
+                                liked ? "text-primary" : "hover:text-primary"
                             )}
                         >
-                            <div className="p-2 rounded-full group-hover:bg-red-50 dark:group-hover:bg-red-900/30 transition-colors">
+                            <div className="p-2 rounded-full group-hover:bg-primary/10 transition-colors">
                                 <Heart size={18} className={cn(liked && "fill-current")} />
                             </div>
                             <span>{likeCount}</span>
@@ -582,7 +582,7 @@ const PostCard: React.FC<PostCardProps> = ({ post, onDelete, onPin, onMediaClick
                             }}
                             className="flex items-center gap-2 group hover:text-blue-500 transition-colors text-sm"
                         >
-                            <div className="p-2 rounded-full group-hover:bg-blue-50 dark:group-hover:bg-blue-900/30 transition-colors">
+                            <div className="p-2 rounded-full group-hover:bg-blue-500/10 transition-colors">
                                 <Share size={18} />
                             </div>
                         </button>
@@ -590,11 +590,11 @@ const PostCard: React.FC<PostCardProps> = ({ post, onDelete, onPin, onMediaClick
 
                     {/* Comments Section */}
                     {showComments && (
-                        <div className="mt-4 pt-4 border-t border-gray-50 dark:border-gray-800 animate-in slide-in-from-top-2">
+                        <div className="mt-4 pt-4 border-t border-border animate-in slide-in-from-top-2">
                             {/* Comment Input */}
                             <div className="flex gap-3 mb-4 items-start">
                                 <div className="relative w-8 h-8 flex-shrink-0">
-                                    <div className="w-full h-full rounded-full bg-gray-200 dark:bg-gray-700  overflow-hidden">
+                                    <div className="w-full h-full rounded-full bg-muted overflow-hidden">
                                         {user?.user_metadata?.avatar_url && <img src={user.user_metadata.avatar_url} className="w-full h-full object-cover" />}
                                     </div>
                                     {profile?.badge_type && (
@@ -605,24 +605,24 @@ const PostCard: React.FC<PostCardProps> = ({ post, onDelete, onPin, onMediaClick
                                 </div>
                                 <div className="flex-1">
                                     {replyingTo && (
-                                        <div className="flex items-center justify-between text-xs text-gray-500 mb-2 ml-2">
+                                        <div className="flex items-center justify-between text-xs text-muted-foreground mb-2 ml-2">
                                             <span>Replying to comment...</span>
-                                            <button onClick={() => setReplyingTo(null)} className="hover:text-red-500"><X size={12} /></button>
+                                            <button onClick={() => setReplyingTo(null)} className="hover:text-destructive"><X size={12} /></button>
                                         </div>
                                     )}
-                                    <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-800 rounded-3xl px-4 py-2 border border-transparent focus-within:border-[#ff1744] focus-within:ring-1 focus-within:ring-[#ff1744]/20 transition-all">
+                                    <div className="flex items-center gap-2 bg-muted rounded-3xl px-4 py-2 border border-transparent focus-within:border-primary focus-within:ring-1 focus-within:ring-primary/20 transition-all">
                                         <input
                                             type="text"
                                             value={newComment}
                                             onChange={(e) => setNewComment(e.target.value)}
                                             placeholder={replyingTo ? "Write a reply..." : "Post your reply"}
-                                            className="flex-1 bg-transparent text-sm outline-none dark:text-white placeholder:text-gray-400"
+                                            className="flex-1 bg-transparent text-sm outline-none text-foreground placeholder:text-muted-foreground"
                                             onKeyDown={(e) => e.key === 'Enter' && handlePostComment()}
                                         />
                                         <button
                                             onClick={handlePostComment}
                                             disabled={!newComment.trim()}
-                                            className="p-1.5 text-[#ff1744] hover:bg-red-50 dark:hover:bg-red-900/20 rounded-full disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                            className="p-1.5 text-primary hover:bg-primary/10 rounded-full disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                                         >
                                             <Send size={16} />
                                         </button>
@@ -643,7 +643,7 @@ const PostCard: React.FC<PostCardProps> = ({ post, onDelete, onPin, onMediaClick
                                         />
                                     ))
                                 ) : (
-                                    <p className="text-center text-gray-400 text-sm py-2">No comments yet.</p>
+                                    <p className="text-center text-muted-foreground text-sm py-2">No comments yet.</p>
                                 )}
                             </div>
                         </div>

@@ -24,6 +24,7 @@ const MyBag: React.FC = () => {
     const [filter, setFilter] = useState<'all' | 'messages' | 'media' | 'files' | 'notes' | 'links'>('all');
     const [searchQuery, setSearchQuery] = useState('');
     const [previewItem, setPreviewItem] = useState<MyBagItem | null>(null);
+    const [editingItem, setEditingItem] = useState<MyBagItem | null>(null);
     const [usedStorage, setUsedStorage] = useState(0);
 
     const EXEMPT_USERS = ["Mubarik Tuahir Ali", "Kausara Mohammed"];
@@ -350,29 +351,103 @@ const MyBag: React.FC = () => {
 
             <AddNoteModal
                 isOpen={showAddNote}
-                onClose={() => setShowAddNote(false)}
+                onClose={() => {
+                    setShowAddNote(false);
+                    setEditingItem(null);
+                }}
                 currentUsage={usedStorage}
                 maxStorage={MAX_STORAGE_BYTES}
+                initialTitle={editingItem?.title}
+                initialContent={editingItem?.content}
+                mode={editingItem ? 'edit' : 'create'}
                 onSave={async (title, content) => {
                     if (!user) return;
-                    const newItem: any = {
-                        user_id: user.id,
-                        type: 'note',
-                        content: content,
-                        title: title,
-                        created_at: new Date().toISOString(),
-                        category: 'notes',
-                        is_locked: false
-                    };
 
-                    // Offline First
-                    await db.my_bag.add({ ...newItem, id: `local-${Date.now()}` });
-                    setItems(prev => [newItem, ...prev]);
+                    if (editingItem) {
+                        // UPDATE EXISTING
+                        try {
+                            const isLocalId = editingItem.id.startsWith('local-');
 
-                    // Sync
-                    supabase.from('my_bag_items').insert(newItem).then(({ error }) => {
-                        if (error) console.error("Sync error", error);
-                    });
+                            if (isLocalId) {
+                                // MIGRATION: Convert local-only note to synced note
+                                const newId = crypto.randomUUID();
+                                const newItem: any = {
+                                    ...editingItem,
+                                    id: newId,
+                                    title,
+                                    content,
+                                    // Ensure user_id is set
+                                    user_id: user?.id || editingItem.user_id,
+                                };
+
+                                // 1. Remove old local item
+                                await db.my_bag.delete(editingItem.id);
+
+                                // 2. Add new item locally
+                                await db.my_bag.add(newItem);
+
+                                // 3. Sync to Supabase (Insert since it's "new" to server)
+                                supabase.from('my_bag_items').insert(newItem).then(({ error }) => {
+                                    if (error) console.error("Migration sync error", error);
+                                });
+
+                                // 4. Update State
+                                setItems(prev => prev.map(i => i.id === editingItem.id ? newItem : i));
+                                if (previewItem?.id === editingItem.id) setPreviewItem(newItem);
+
+                            } else {
+                                // STANDARD UPDATE
+                                const updatedItem = { ...editingItem, title, content };
+
+                                // 1. Update Local DB (Offline First)
+                                await db.my_bag.put(updatedItem);
+
+                                // 2. Update State immediately
+                                setItems(prev => prev.map(i => i.id === editingItem.id ? updatedItem : i));
+                                if (previewItem?.id === editingItem.id) setPreviewItem(updatedItem);
+
+                                // 3. Update Supabase
+                                const { error } = await supabase
+                                    .from('my_bag_items')
+                                    .update({ title, content })
+                                    .eq('id', editingItem.id);
+
+                                if (error) {
+                                    console.error("Supabase update error", error);
+                                    // alerting user might be annoying if it's just sync, but helpful for debugging
+                                    // alert("Note saved locally, but failed to sync.");
+                                }
+                            }
+
+                            setEditingItem(null);
+                        } catch (err: any) {
+                            console.error("Update failed", err);
+                            alert(`Failed to update note: ${err.message || err}`);
+                        }
+
+                    } else {
+                        // CREATE NEW
+                        const newId = crypto.randomUUID();
+                        const newItem: any = {
+                            id: newId,
+                            user_id: user.id,
+                            type: 'note',
+                            content: content,
+                            title: title,
+                            created_at: new Date().toISOString(),
+                            category: 'notes',
+                            is_locked: false
+                        };
+
+                        // Offline First
+                        await db.my_bag.add(newItem);
+                        setItems(prev => [newItem, ...prev]);
+
+                        // Sync
+                        supabase.from('my_bag_items').insert(newItem).then(({ error }) => {
+                            if (error) console.error("Sync error", error);
+                        });
+                    }
                 }}
             />
 
@@ -393,6 +468,16 @@ const MyBag: React.FC = () => {
                 item={previewItem}
                 onDelete={handleDeleteItem}
                 onDownload={handleDownloadItem}
+                onEdit={(item) => {
+                    // Only notes allow edit for now
+                    if (item.type === 'note') {
+                        setEditingItem(item);
+                        setShowAddNote(true);
+                        // Optional: close preview or keep it open?
+                        // If we keep preview open, it will need to update when save happens.
+                        // We handled that in onSave.
+                    }
+                }}
             />
         </div>
     );

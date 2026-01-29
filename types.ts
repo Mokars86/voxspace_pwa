@@ -102,3 +102,74 @@ export interface Comment {
   };
   children?: Comment[];
 }
+
+export type SpaceRole = 'owner' | 'moderator' | 'member';
+
+export interface SpaceMember {
+  id?: string;
+  user_id: string;
+  space_id: string;
+  role: SpaceRole;
+  joined_at: string;
+  profile?: {
+    full_name: string;
+    username: string;
+    avatar_url: string;
+  };
+}
+
+export interface PollOption {
+  id: string;
+  poll_id: string;
+  text: string;
+  vote_count: number;
+}
+
+export interface Poll {
+  id: string;
+  space_id: string;
+  question: string;
+  options: PollOption[];
+  created_by: string;
+  created_at: string;
+  expires_at?: string;
+  user_vote_id?: string; // If user voted
+  is_active: boolean;
+  creator?: {
+    full_name: string;
+    avatar_url: string;
+  };
+}
+
+export interface SpaceResource {
+  id: string;
+  space_id: string;
+  title: string;
+  description?: string;
+  url: string;
+  type: 'link' | 'pdf' | 'doc' | 'image';
+  created_by: string;
+  created_at: string;
+  uploader?: {
+    full_name: string;
+  };
+}
+
+export interface SpaceAnnouncement {
+  id: string;
+  space_id: string;
+  content: string;
+  created_at: string;
+  active_until?: string;
+}
+
+export interface VoiceParticipant {
+  user_id: string;
+  joined_at: string;
+  is_muted: boolean;
+  is_speaking: boolean;
+  profile?: {
+    full_name: string;
+    avatar_url: string;
+  };
+}

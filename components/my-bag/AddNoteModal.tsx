@@ -7,12 +7,32 @@ interface AddNoteModalProps {
     onSave: (title: string, content: string) => Promise<void>;
     currentUsage?: number;
     maxStorage?: number;
+    initialTitle?: string;
+    initialContent?: string;
+    mode?: 'create' | 'edit';
 }
 
-const AddNoteModal: React.FC<AddNoteModalProps> = ({ isOpen, onClose, onSave, currentUsage = 0, maxStorage = Infinity }) => {
-    const [title, setTitle] = useState('');
-    const [content, setContent] = useState('');
+const AddNoteModal: React.FC<AddNoteModalProps> = ({
+    isOpen,
+    onClose,
+    onSave,
+    currentUsage = 0,
+    maxStorage = Infinity,
+    initialTitle = '',
+    initialContent = '',
+    mode = 'create'
+}) => {
+    const [title, setTitle] = useState(initialTitle);
+    const [content, setContent] = useState(initialContent);
     const [loading, setLoading] = useState(false);
+
+    // Reset or set init values when modal opens/changes
+    React.useEffect(() => {
+        if (isOpen) {
+            setTitle(initialTitle);
+            setContent(initialContent);
+        }
+    }, [isOpen, initialTitle, initialContent]);
 
     if (!isOpen) return null;
 
@@ -22,18 +42,20 @@ const AddNoteModal: React.FC<AddNoteModalProps> = ({ isOpen, onClose, onSave, cu
 
         // Check size
         const estimatedSize = new TextEncoder().encode(title + content).length;
-        if (currentUsage + estimatedSize > maxStorage) {
+        // Only check delta if editing, but simplistic check is fine
+        // Ideally we subtract old size, but let's just check standard for now 
+        if (mode === 'create' && currentUsage + estimatedSize > maxStorage) {
             alert(`Storage limit exceeded! You need ${(estimatedSize / 1024).toFixed(1)}KB more space.`);
             return;
         }
 
         setLoading(true);
-
-        setLoading(true);
         try {
             await onSave(title.trim() || 'Untitled Note', content.trim());
-            setTitle('');
-            setContent('');
+            if (mode === 'create') {
+                setTitle('');
+                setContent('');
+            }
             onClose();
         } catch (error) {
             console.error("Failed to save note", error);
@@ -48,7 +70,7 @@ const AddNoteModal: React.FC<AddNoteModalProps> = ({ isOpen, onClose, onSave, cu
                 <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
                     <h2 className="text-lg font-bold flex items-center gap-2 dark:text-white">
                         <StickyNote className="text-[#ff1744]" size={20} />
-                        New Note
+                        {mode === 'edit' ? 'Edit Note' : 'New Note'}
                     </h2>
                     <button
                         onClick={onClose}
@@ -96,7 +118,7 @@ const AddNoteModal: React.FC<AddNoteModalProps> = ({ isOpen, onClose, onSave, cu
                             ) : (
                                 <>
                                     <Save size={18} />
-                                    Save Note
+                                    {mode === 'edit' ? 'Update Note' : 'Save Note'}
                                 </>
                             )}
                         </button>

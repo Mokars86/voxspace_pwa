@@ -342,7 +342,7 @@ const MessageBubble: React.FC<MessageProps> = ({ message, onSwipeReply, onReact,
 
             <div
                 className={cn(
-                    "relative max-w-[75%] rounded-2xl shadow-sm transition-transform duration-75 overflow-hidden",
+                    "relative max-w-[85%] rounded-2xl shadow-sm transition-transform duration-75 overflow-hidden",
                     isMe
                         ? "text-white rounded-tr-none"
                         : "bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-tl-none"
@@ -628,7 +628,7 @@ const MessageBubble: React.FC<MessageProps> = ({ message, onSwipeReply, onReact,
 
                     {/* Buzz Content */}
                     {message.type === 'buzz' && (
-                        <div className="flex items-center gap-2 font-bold text-lg italic tracking-wider py-1 px-2">
+                        <div className="flex items-center gap-2 font-bold text-lg italic tracking-wider py-1">
                             <span className="text-2xl">⚡</span> BUZZ!
                         </div>
                     )}

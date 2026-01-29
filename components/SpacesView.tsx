@@ -73,24 +73,24 @@ const SpacesView: React.FC = () => {
   }, [activeCategory, showAllSpaces]);
 
   return (
-    <div className="flex flex-col h-full bg-white dark:bg-gray-900 relative transition-colors">
-      <div className="p-4 border-b border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 sticky top-0 z-10">
+    <div className="flex flex-col h-full bg-background relative transition-colors">
+      <div className="p-4 border-b border-border bg-background sticky top-0 z-10">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-2xl font-bold tracking-tight dark:text-white">Spaces</h2>
+          <h2 className="text-2xl font-bold tracking-tight text-foreground">Spaces</h2>
           <button
             onClick={() => setShowCreateModal(true)}
-            className="p-2 bg-[#ff1744] text-white rounded-full hover:bg-red-600 transition-colors shadow-md"
+            className="p-2 bg-primary text-white rounded-full hover:bg-primary/90 transition-colors shadow-md"
           >
             <Plus size={20} />
           </button>
         </div>
 
         <div className="relative mb-4">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} />
           <input
             type="text"
             placeholder="Find communities..."
-            className="w-full pl-10 pr-4 py-2 bg-gray-50 dark:bg-gray-800 rounded-xl border-none focus:ring-1 focus:ring-[#ff1744] outline-none text-sm font-medium dark:text-white dark:placeholder:text-gray-500"
+            className="w-full pl-10 pr-4 py-2 bg-muted rounded-xl border-none focus:ring-1 focus:ring-primary outline-none text-sm font-medium text-foreground placeholder:text-muted-foreground"
           />
         </div>
 
@@ -100,8 +100,8 @@ const SpacesView: React.FC = () => {
               key={cat}
               onClick={() => setActiveCategory(cat)}
               className={`px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${activeCategory === cat
-                ? 'bg-black dark:bg-white text-white dark:text-black'
-                : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+                ? 'bg-foreground text-background'
+                : 'bg-muted text-muted-foreground hover:bg-muted/80'
                 }`}
             >
               {cat}
@@ -139,7 +139,7 @@ const SpacesView: React.FC = () => {
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <Globe size={20} className="text-blue-500" />
-              <h3 className="font-bold text-lg dark:text-white">
+              <h3 className="font-bold text-lg text-foreground">
                 {showAllSpaces ? 'All Spaces' : 'Recommended Spaces'}
               </h3>
             </div>

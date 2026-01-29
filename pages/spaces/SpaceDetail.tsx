@@ -9,6 +9,12 @@ import PostCard from '../../components/PostCard';
 import { SpaceChatRoomContent } from './SpaceChatRoom';
 import SpaceMembersModal from '../../components/SpaceMembersModal';
 import ImageViewer from '../../components/ImageViewer';
+import SpacePolls from '../../components/space/SpacePolls';
+import SpaceResources from '../../components/space/SpaceResources';
+import SpaceLeaderboard from '../../components/space/SpaceLeaderboard';
+import VoiceLounge from '../../components/space/VoiceLounge';
+import AnnouncementBanner from '../../components/space/AnnouncementBanner';
+import { SpaceRole } from '../../types';
 
 
 const SpaceDetail: React.FC = () => {
@@ -18,7 +24,7 @@ const SpaceDetail: React.FC = () => {
 
     const [space, setSpace] = useState<any>(null);
     const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState<'posts' | 'chat' | 'media' | 'events'>('posts');
+    const [activeTab, setActiveTab] = useState<'posts' | 'chat' | 'media' | 'events' | 'polls' | 'resources' | 'voice'>('posts');
 
     // Feature States
     const [posts, setPosts] = useState<Post[]>([]);
@@ -27,7 +33,6 @@ const SpaceDetail: React.FC = () => {
     // Edit States
     const [isEditing, setIsEditing] = useState(false);
     const [editName, setEditName] = useState('');
-
     const [editDescription, setEditDescription] = useState('');
     const [newPostContent, setNewPostContent] = useState('');
 
@@ -35,44 +40,22 @@ const SpaceDetail: React.FC = () => {
     const [uploading, setUploading] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [isMember, setIsMember] = useState(false);
+    const [memberRole, setMemberRole] = useState<SpaceRole | 'guest'>('guest');
     const [joinLoading, setJoinLoading] = useState(false);
     const [showMembersModal, setShowMembersModal] = useState(false);
+    const [memberStatus, setMemberStatus] = useState<'pending' | 'approved' | null>(null);
 
     // Post Media States
     const [postMedia, setPostMedia] = useState<File | Blob | null>(null);
     const [postMediaType, setPostMediaType] = useState<'image' | 'audio' | null>(null);
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
     const [isRecording, setIsRecording] = useState(false);
+    const [recordingDuration, setRecordingDuration] = useState(0);
 
     // Event State
     const [showEventModal, setShowEventModal] = useState(false);
     const [newEvent, setNewEvent] = useState({ title: '', description: '', start_time: '', location: '' });
     const [viewingImage, setViewingImage] = useState<{ url: string, type: 'image' | 'video' } | null>(null);
-
-
-    const handleCreateEvent = async () => {
-        if (!newEvent.title || !newEvent.start_time || !user) return;
-        try {
-            const { error } = await supabase.from('space_events').insert({
-                space_id: id,
-                title: newEvent.title,
-                description: newEvent.description,
-                start_time: new Date(newEvent.start_time).toISOString(),
-                location: newEvent.location,
-                created_by: user.id
-            });
-            if (error) throw error;
-            setShowEventModal(false);
-            setNewEvent({ title: '', description: '', start_time: '', location: '' });
-            fetchEvents();
-            alert("Event created successfully!");
-        } catch (error: any) {
-            console.error("Error creating event:", error);
-            alert("Failed to create event");
-        }
-    };
-
-    const [recordingDuration, setRecordingDuration] = useState(0);
 
     // Refs
     const postFileInputRef = useRef<HTMLInputElement>(null);
@@ -134,114 +117,6 @@ const SpaceDetail: React.FC = () => {
         }
     };
 
-    const handlePostSubmit = async () => {
-        if ((!newPostContent.trim() && !postMedia) || !user) return;
-
-        setUploading(true);
-
-        // Optimistic Update
-        const tempId = `temp-${Date.now()}`;
-        const optimisticPost: Post = {
-            id: tempId,
-            author: {
-                id: user.id,
-                name: user.user_metadata?.full_name || 'Me',
-                username: user.user_metadata?.username || 'user',
-                avatar: user.user_metadata?.avatar_url || '',
-                isVerified: false
-            },
-            content: newPostContent,
-            timestamp: "Just now",
-            likes: 0,
-            comments: 0,
-            reposts: 0,
-            media: previewUrl || undefined,
-            media_type: postMediaType || undefined, // Use current state or default
-            isLiked: false,
-            is_pinned: false
-        };
-
-        setPosts(prev => [optimisticPost, ...prev]);
-
-        // Clear Form Immediately
-        const tempContent = newPostContent;
-        const tempMedia = postMedia;
-        const tempMediaType = postMediaType;
-
-        setNewPostContent('');
-        setPostMedia(null);
-        setPostMediaType(null);
-        setPreviewUrl(null);
-
-        try {
-            let mediaUrl = '';
-            let mediaType = null;
-
-            if (tempMedia) {
-                const ext = tempMediaType === 'audio' ? 'webm' : tempMedia instanceof File ? tempMedia.name.split('.').pop() : 'jpg';
-                const fileName = `space-post-${Date.now()}.${ext}`;
-                // Usage of proven bucket
-                const { error: uploadError } = await supabase.storage.from('post_media').upload(fileName, tempMedia);
-
-                if (uploadError) throw uploadError;
-
-                const { data } = supabase.storage.from('post_media').getPublicUrl(fileName);
-                mediaUrl = data.publicUrl;
-                mediaType = tempMediaType;
-            }
-
-            const { error } = await supabase.from('posts').insert({
-                space_id: id,
-                user_id: user.id,
-                content: tempContent,
-                media_url: mediaUrl || null,
-                media_type: mediaType || undefined // FIX: Send undefined if null to use DB default
-            });
-
-            if (error) throw error;
-
-            fetchPosts(); // Refresh to get real ID
-
-        } catch (error: any) {
-            console.error("Post failed:", error);
-            alert("Failed to post: " + error.message);
-            // Rollback
-            setPosts(prev => prev.filter(p => p.id !== tempId));
-            // Restore form state? 
-            setNewPostContent(tempContent);
-            setPostMedia(tempMedia);
-            setPostMediaType(tempMediaType);
-            if (tempMedia) setPreviewUrl(URL.createObjectURL(tempMedia as any)); // Re-create preview
-        } finally {
-            setUploading(false);
-        }
-    };
-
-
-
-    const handleShare = async () => {
-        try {
-            await navigator.clipboard.writeText(window.location.href);
-            alert("Space link copied to clipboard!");
-        } catch (err) {
-            console.error('Failed to copy text: ', err);
-        }
-    };
-
-    const handleDelete = async () => {
-        if (!space || !user) return;
-        if (!window.confirm("Are you sure you want to delete this space? This cannot be undone.")) return;
-
-        try {
-            const { error } = await supabase.from('spaces').delete().eq('id', space.id);
-            if (error) throw error;
-            navigate('/spaces');
-        } catch (error: any) {
-            console.error("Error deleting space:", error);
-            alert("Failed to delete space: " + error.message);
-        }
-    };
-
     const fetchPosts = async () => {
         if (!id) return;
         const { data, error } = await supabase
@@ -268,6 +143,7 @@ const SpaceDetail: React.FC = () => {
                 comments: p.comments_count,
                 reposts: p.reposts_count,
                 media: p.media_url,
+                media_type: p.media_type,
                 isLiked: user ? p.post_likes?.some((l: any) => l.user_id === user.id) : false,
                 is_pinned: p.is_pinned
             }));
@@ -281,7 +157,103 @@ const SpaceDetail: React.FC = () => {
         if (data) setEvents(data);
     };
 
-    const [memberStatus, setMemberStatus] = useState<'pending' | 'approved' | null>(null);
+    const handlePostSubmit = async () => {
+        if ((!newPostContent.trim() && !postMedia) || !user) return;
+
+        setUploading(true);
+
+        // Optimistic Update
+        const tempId = `temp-${Date.now()}`;
+        const optimisticPost: Post = {
+            id: tempId,
+            author: {
+                id: user.id,
+                name: user.user_metadata?.full_name || 'Me',
+                username: user.user_metadata?.username || 'user',
+                avatar: user.user_metadata?.avatar_url || '',
+                isVerified: false
+            },
+            content: newPostContent,
+            timestamp: "Just now",
+            likes: 0,
+            comments: 0,
+            reposts: 0,
+            media: previewUrl || undefined,
+            media_type: postMediaType || undefined,
+            isLiked: false,
+            is_pinned: false
+        };
+
+        setPosts(prev => [optimisticPost, ...prev]);
+
+        // Clear Form Immediately
+        const tempContent = newPostContent;
+        const tempMedia = postMedia;
+        const tempMediaType = postMediaType;
+
+        setNewPostContent('');
+        setPostMedia(null);
+        setPostMediaType(null);
+        setPreviewUrl(null);
+
+        try {
+            let mediaUrl = '';
+            let mediaType = null;
+
+            if (tempMedia) {
+                const ext = tempMediaType === 'audio' ? 'webm' : tempMedia instanceof File ? tempMedia.name.split('.').pop() : 'jpg';
+                const fileName = `space-post-${Date.now()}.${ext}`;
+                const { error: uploadError } = await supabase.storage.from('post_media').upload(fileName, tempMedia);
+
+                if (uploadError) throw uploadError;
+
+                const { data } = supabase.storage.from('post_media').getPublicUrl(fileName);
+                mediaUrl = data.publicUrl;
+                mediaType = tempMediaType;
+            }
+
+            const { error } = await supabase.from('posts').insert({
+                space_id: id,
+                user_id: user.id,
+                content: tempContent,
+                media_url: mediaUrl || null,
+                media_type: mediaType || undefined
+            });
+
+            if (error) throw error;
+
+            fetchPosts();
+
+        } catch (error: any) {
+            console.error("Post failed:", error);
+            alert("Failed to post: " + error.message);
+            setPosts(prev => prev.filter(p => p.id !== tempId));
+        } finally {
+            setUploading(false);
+        }
+    };
+
+    const handleCreateEvent = async () => {
+        if (!newEvent.title || !newEvent.start_time || !user) return;
+        try {
+            const { error } = await supabase.from('space_events').insert({
+                space_id: id,
+                title: newEvent.title,
+                description: newEvent.description,
+                start_time: new Date(newEvent.start_time).toISOString(),
+                location: newEvent.location,
+                created_by: user.id
+            });
+            if (error) throw error;
+            setShowEventModal(false);
+            setNewEvent({ title: '', description: '', start_time: '', location: '' });
+            fetchEvents();
+            alert("Event created successfully!");
+        } catch (error: any) {
+            console.error("Error creating event:", error);
+            alert("Failed to create event");
+        }
+    };
 
     useEffect(() => {
         const fetchSpace = async () => {
@@ -303,7 +275,7 @@ const SpaceDetail: React.FC = () => {
                 if (user) {
                     const { data: memberData } = await supabase
                         .from('space_members')
-                        .select('status')
+                        .select('status, role')
                         .eq('space_id', id)
                         .eq('user_id', user.id)
                         .single();
@@ -311,9 +283,11 @@ const SpaceDetail: React.FC = () => {
                     if (memberData) {
                         setIsMember(memberData.status === 'approved');
                         setMemberStatus(memberData.status);
+                        setMemberRole((memberData.role as SpaceRole) || 'member');
                     } else {
                         setIsMember(false);
                         setMemberStatus(null);
+                        setMemberRole('guest');
                     }
                 }
 
@@ -379,6 +353,29 @@ const SpaceDetail: React.FC = () => {
             supabase.removeChannel(channel);
         };
     }, [id, user]);
+
+    const handleShare = async () => {
+        try {
+            await navigator.clipboard.writeText(window.location.href);
+            alert("Space link copied to clipboard!");
+        } catch (err) {
+            console.error('Failed to copy text: ', err);
+        }
+    };
+
+    const handleDelete = async () => {
+        if (!space || !user) return;
+        if (!window.confirm("Are you sure you want to delete this space? This cannot be undone.")) return;
+
+        try {
+            const { error } = await supabase.from('spaces').delete().eq('id', space.id);
+            if (error) throw error;
+            navigate('/spaces');
+        } catch (error: any) {
+            console.error("Error deleting space:", error);
+            alert("Failed to delete space: " + error.message);
+        }
+    };
 
 
     const handleJoinLeave = async () => {
@@ -496,7 +493,7 @@ const SpaceDetail: React.FC = () => {
     const isOwner = user?.id === space.owner_id;
 
     return (
-        <div className="flex flex-col h-screen bg-white dark:bg-black relative">
+        <div className="flex flex-col h-screen bg-background text-foreground relative">
             {/* Header Image */}
             <div className="h-48 md:h-64 relative group flex-shrink-0">
                 <img
@@ -537,8 +534,8 @@ const SpaceDetail: React.FC = () => {
                     </div>
                 )}
 
-                <div className="absolute bottom-0 left-0 right-0 p-6 text-white z-10 flex items-end justify-between">
-                    <div>
+                <div className="absolute bottom-0 left-0 right-0 p-6 text-white z-10 flex items-end justify-between gap-4">
+                    <div className="flex-1 min-w-0">
                         {isEditing ? (
                             <input
                                 value={editName}
@@ -546,7 +543,7 @@ const SpaceDetail: React.FC = () => {
                                 className="text-3xl font-bold mb-2 bg-black/40 text-white border-b border-white/50 focus:outline-none w-full"
                             />
                         ) : (
-                            <h1 className="text-3xl font-bold mb-2 shadow-sm drop-shadow-md">{space.name}</h1>
+                            <h1 className="text-3xl font-bold mb-2 shadow-sm drop-shadow-md break-words">{space.name}</h1>
                         )}
 
                         <div className="flex items-center gap-4 text-sm font-medium">
@@ -561,7 +558,7 @@ const SpaceDetail: React.FC = () => {
                     </div>
 
                     {isOwner ? (
-                        <div className="flex gap-2">
+                        <div className="flex gap-2 shrink-0">
                             {isEditing ? (
                                 <>
                                     <button onClick={() => setIsEditing(false)} className="px-4 py-2 bg-white/20 hover:bg-white/30 backdrop-blur-md rounded-lg text-sm font-bold">Cancel</button>
@@ -578,7 +575,7 @@ const SpaceDetail: React.FC = () => {
                             onClick={handleJoinLeave}
                             disabled={joinLoading}
                             className={cn(
-                                "px-6 py-2 rounded-full font-bold shadow-lg transition-all active:scale-95 disabled:opacity-50",
+                                "px-6 py-2 rounded-full font-bold shadow-lg transition-all active:scale-95 disabled:opacity-50 whitespace-nowrap flex-shrink-0 flex items-center justify-center gap-2",
                                 isMember
                                     ? "bg-white/20 hover:bg-white/30 text-white backdrop-blur-md"
                                     : memberStatus === 'pending'
@@ -593,17 +590,20 @@ const SpaceDetail: React.FC = () => {
                 </div>
             </div>
 
+            {/* Announcement Banner */}
+            <AnnouncementBanner spaceId={space.id} isOwner={isOwner || memberRole === 'moderator'} />
+
             {/* Tabs */}
-            <div className="bg-white border-b border-gray-100 flex sticky top-0 z-10">
-                {['posts', 'chat', 'media', 'events'].map((tab) => (
+            <div className="bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700 flex overflow-x-auto scrollbar-hide sticky top-0 z-10">
+                {['posts', 'chat', 'voice', 'events', 'polls', 'resources', 'media'].map((tab) => (
                     <button
                         key={tab}
                         onClick={() => setActiveTab(tab as any)}
                         className={cn(
-                            "flex-1 py-3 text-sm font-bold uppercase tracking-wide border-b-2 transition-colors",
+                            "flex-1 py-3 px-4 text-sm font-bold uppercase tracking-wide border-b-2 transition-colors whitespace-nowrap",
                             activeTab === tab
                                 ? "border-[#ff1744] text-[#ff1744]"
-                                : "border-transparent text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 bg-white dark:bg-black"
+                                : "border-transparent text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white"
                         )}
                     >
                         {tab}
@@ -628,6 +628,11 @@ const SpaceDetail: React.FC = () => {
                             ) : (
                                 <p className="text-gray-700 dark:text-gray-300 text-sm leading-relaxed whitespace-pre-wrap">{space.description}</p>
                             )}
+
+                            {/* Leaderboard Widget */}
+                            <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700">
+                                <SpaceLeaderboard spaceId={id!} />
+                            </div>
                         </div>
 
                         {/* Create Post */}
@@ -764,6 +769,29 @@ const SpaceDetail: React.FC = () => {
                                 <p className="text-gray-500 mb-4">You must be a member to access the chat room.</p>
                             </div>
                         )}
+                    </div>
+                )}
+
+                {/* POLLS TAB */}
+                {activeTab === 'polls' && (
+                    <div className="min-h-full pb-20">
+                        <SpacePolls spaceId={id!} isMember={isMember} role={memberRole as string} />
+                    </div>
+                )}
+
+                {/* RESOURCES TAB */}
+                {activeTab === 'resources' && (
+                    <div className="min-h-full pb-20">
+                        <SpaceResources spaceId={id!} isMember={isMember} role={memberRole as string} />
+                    </div>
+                )}
+
+                {/* VOICE TAB */}
+                {activeTab === 'voice' && (
+                    <div className="p-4 space-y-4 pb-20">
+                        <p className="text-sm text-gray-500 text-center">Join the live audio lounge to hang out with other members.</p>
+                        <VoiceLounge spaceId={id!} />
+                        {/* We can re-use the chat or other widgets here if needed */}
                     </div>
                 )}
 

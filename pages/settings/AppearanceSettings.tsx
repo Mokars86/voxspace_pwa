@@ -27,6 +27,7 @@ const AppearanceSettings: React.FC = () => {
                             selected={mode === 'light'}
                             onClick={() => setMode('light')}
                             colorClass="bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                            hoverClass="hover:bg-gray-200 dark:hover:bg-gray-700"
                         />
                         <ThemeCard
                             icon={<Moon size={24} />}
@@ -34,6 +35,7 @@ const AppearanceSettings: React.FC = () => {
                             selected={mode === 'dark'}
                             onClick={() => setMode('dark')}
                             colorClass="bg-gray-900 text-white"
+                            hoverClass="hover:bg-gray-800"
                         />
                     </div>
                 </section>
@@ -171,12 +173,12 @@ const WallpaperSection = () => {
     );
 };
 
-const ThemeCard = ({ icon, label, selected, onClick, colorClass }: any) => (
+const ThemeCard = ({ icon, label, selected, onClick, colorClass, hoverClass }: any) => (
     <button
         onClick={onClick}
         className={`flex flex-col items-center gap-3 p-6 rounded-2xl border-2 transition-all duration-200 ${selected
             ? 'border-primary ring-2 ring-primary/20 scale-[1.02]'
-            : 'border-transparent hover:bg-muted/50'
+            : `border-transparent ${hoverClass || 'hover:bg-muted/50'}`
             } ${colorClass}`}
     >
         {icon}

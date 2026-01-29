@@ -176,7 +176,7 @@ const ProfileView: React.FC = () => {
     <div className="flex flex-col h-full bg-white dark:bg-gray-900 transition-colors">
       {/* Header/Cover */}
       <div className="h-32 bg-gradient-to-r from-pink-500 to-orange-500 relative">
-        <button onClick={() => navigate('/settings')} className="absolute top-4 right-4 p-2 bg-black/20 rounded-full text-white backdrop-blur-sm hover:bg-black/30 transition-colors">
+        <button onClick={() => navigate('/settings')} className="absolute top-4 right-4 p-2 bg-black/20 rounded-full text-white backdrop-blur-sm hover:bg-black/30 transition-colors z-10">
           <Settings size={20} />
         </button>
       </div>
@@ -200,12 +200,7 @@ const ProfileView: React.FC = () => {
               </div>
             )}
           </button>
-          <button
-            onClick={() => navigate('/settings')}
-            className="px-4 py-1.5 border border-gray-300 dark:border-gray-700 rounded-full font-bold text-sm hover:bg-gray-50 dark:hover:bg-gray-800 dark:text-gray-200 transition-colors"
-          >
-            Edit Profile
-          </button>
+
         </div>
 
         <div>
