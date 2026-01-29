@@ -20,6 +20,7 @@ interface ProfileData {
     profile_photo_privacy?: 'everyone' | 'contacts' | 'nobody';
     about_privacy?: 'everyone' | 'contacts' | 'nobody';
     badge_type?: BadgeType;
+    banner_url?: string;
 }
 
 const UserProfile: React.FC = () => {
@@ -226,7 +227,13 @@ const UserProfile: React.FC = () => {
     return (
         <div className="flex flex-col h-screen bg-white dark:bg-black">
             {/* Header */}
-            <div className="h-32 bg-gradient-to-r from-blue-500 to-purple-500 relative">
+            <div className="h-48 bg-gray-200 relative">
+                {profile.banner_url ? (
+                    <img src={profile.banner_url} alt="Banner" className="w-full h-full object-cover" />
+                ) : (
+                    <div className="w-full h-full bg-gradient-to-r from-blue-500 to-purple-500" />
+                )}
+
                 <button onClick={() => navigate(-1)} className="absolute top-4 left-4 p-2 bg-black/20 rounded-full text-white backdrop-blur-sm hover:bg-black/30 transition-colors z-10">
                     <ArrowLeft size={20} />
                 </button>
@@ -252,17 +259,16 @@ const UserProfile: React.FC = () => {
                     </div>
                 )}
                 {isOwnProfile && (
-                     <button
+                    <button
                         onClick={() => navigate('/settings')}
                         className="absolute top-4 right-4 p-2 bg-black/20 rounded-full text-white backdrop-blur-sm hover:bg-black/30 transition-colors z-10"
                     >
                         <Settings size={20} />
                     </button>
                 )}
-            </div>
 
-            <div className="px-4 pb-4 relative">
-                <div className="flex justify-between items-end mt-4 mb-4">
+                {/* Overlapping Avatar */}
+                <div className="absolute -bottom-10 left-4 z-20">
                     <button
                         onClick={() => profile.avatar_url && setPreviewImage(profile.avatar_url)}
                         className={`relative rounded-full ${profile.avatar_url ? 'cursor-pointer' : 'cursor-default'}`}
@@ -273,14 +279,19 @@ const UserProfile: React.FC = () => {
                                 ? (profile.avatar_url || `https://ui-avatars.com/api/?name=${profile.full_name}&background=random`)
                                 : `https://ui-avatars.com/api/?name=${profile.full_name?.charAt(0) || 'U'}&background=random`}
                             alt="Profile"
-                            className="w-20 h-20 rounded-full border-4 border-white object-cover shadow-sm bg-white hover:opacity-90 transition-opacity"
+                            className="w-24 h-24 rounded-full border-4 border-white dark:border-gray-900 object-cover shadow-sm bg-white hover:opacity-90 transition-opacity"
                         />
                         {profile.badge_type && (
                             <div className="absolute bottom-1 right-1 z-10">
-                                <BadgeIcon type={profile.badge_type} size={20} className="p-0.5" />
+                                <BadgeIcon type={profile.badge_type} size={24} className="p-0.5" />
                             </div>
                         )}
                     </button>
+                </div>
+            </div>
+
+            <div className="px-4 pb-4 relative mt-12">
+                <div className="flex justify-end items-center mb-4 min-h-[40px]">
                     <div className="flex gap-2">
                         {isOwnProfile ? (
                             null
@@ -289,17 +300,17 @@ const UserProfile: React.FC = () => {
                                 <button
                                     onClick={handleMessage}
                                     disabled={messagingLoading}
-                                    className="p-2 border border-gray-200 rounded-full text-gray-600 hover:bg-gray-50 flex items-center justify-center"
+                                    className="p-2 border border-gray-200 dark:border-gray-800 rounded-full text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center justify-center transition-colors"
                                 >
-                                    {messagingLoading ? <Loader2 size={16} className="animate-spin" /> : <MessageSquare size={18} />}
+                                    {messagingLoading ? <Loader2 size={18} className="animate-spin" /> : <MessageSquare size={20} />}
                                 </button>
                                 <button
                                     onClick={handleFollowToggle}
                                     disabled={followLoading}
                                     className={`px-6 py-1.5 rounded-full font-bold text-sm flex items-center justify-center min-w-[100px] transition-all
                                         ${isFollowing
-                                            ? "bg-white border border-gray-300 text-gray-900 hover:bg-gray-50"
-                                            : "bg-gray-900 text-white hover:bg-gray-800"
+                                            ? "bg-white dark:bg-black border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white hover:bg-gray-50 dark:hover:bg-gray-900"
+                                            : "bg-gray-900 dark:bg-white text-white dark:text-black hover:opacity-90"
                                         }`}
                                 >
                                     {followLoading ? <Loader2 size={14} className="animate-spin" /> : (isFollowing ? "Following" : "Follow")}

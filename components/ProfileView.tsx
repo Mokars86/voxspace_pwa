@@ -24,6 +24,7 @@ interface ProfileData {
   badge_type?: BadgeType;
   referral_count?: number;
   referral_code?: string;
+  banner_url?: string;
 }
 
 const ProfileView: React.FC = () => {
@@ -175,15 +176,19 @@ const ProfileView: React.FC = () => {
   return (
     <div className="flex flex-col h-full bg-white dark:bg-gray-900 transition-colors">
       {/* Header/Cover */}
-      <div className="h-32 bg-gradient-to-r from-pink-500 to-orange-500 relative">
+      {/* Header/Cover */}
+      <div className="h-48 bg-gray-200 relative">
+        {profile?.banner_url ? (
+          <img src={profile.banner_url} alt="Cover" className="w-full h-full object-cover" />
+        ) : (
+          <div className="w-full h-full bg-gradient-to-r from-pink-500 to-orange-500" />
+        )}
         <button onClick={() => navigate('/settings')} className="absolute top-4 right-4 p-2 bg-black/20 rounded-full text-white backdrop-blur-sm hover:bg-black/30 transition-colors z-10">
           <Settings size={20} />
         </button>
-      </div>
 
-      {/* Profile Info */}
-      <div className="px-4 pb-4 relative">
-        <div className="flex justify-between items-end mt-4 mb-4">
+        {/* Overlapping Avatar */}
+        <div className="absolute -bottom-10 left-4">
           <button
             onClick={() => displayProfile.avatar_url && setPreviewImage(displayProfile.avatar_url)}
             className={`relative rounded-full ${displayProfile.avatar_url ? 'cursor-pointer' : 'cursor-default'}`}
@@ -192,124 +197,127 @@ const ProfileView: React.FC = () => {
             <img
               src={displayProfile.avatar_url || `https://ui-avatars.com/api/?name=${displayProfile.full_name || 'User'}&background=random`}
               alt="Profile"
-              className="w-20 h-20 rounded-full border-4 border-white dark:border-gray-900 object-cover hover:opacity-90 transition-opacity"
+              className="w-24 h-24 rounded-full border-4 border-white dark:border-gray-900 object-cover shadow-sm bg-white hover:opacity-90 transition-opacity"
             />
             {displayProfile.badge_type && (
               <div className="absolute bottom-1 right-1 z-10">
-                <BadgeIcon type={displayProfile.badge_type} size={20} className="p-0.5" />
+                <BadgeIcon type={displayProfile.badge_type} size={24} className="p-0.5" />
               </div>
             )}
           </button>
-
-        </div>
-
-        <div>
-          <div className="flex items-center gap-1">
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{displayProfile.full_name}</h1>
-          </div>
-          <p className="text-gray-500 dark:text-gray-400 text-sm mb-3">@{displayProfile.username}</p>
-          <p className="text-gray-900 dark:text-gray-100 mb-3 whitespace-pre-wrap">
-            {displayProfile.bio || "No bio yet."}
-          </p>
-
-          <div className="flex items-center gap-1">
-            <Calendar size={16} />
-            Joined {new Date(displayProfile.created_at).toLocaleDateString()}
-          </div>
-          {displayProfile.website && (() => {
-            try {
-              const url = new URL(displayProfile.website.includes('://') ? displayProfile.website : `https://${displayProfile.website}`);
-              return (
-                <div className="flex items-center gap-1 mt-1">
-                  <LinkIcon size={16} />
-                  <a href={url.toString()} target="_blank" rel="noopener noreferrer" className="text-[#ff1744] hover:underline">
-                    {url.hostname}
-                  </a>
-                </div>
-              );
-            } catch {
-              return (
-                <div className="flex items-center gap-1 mt-1">
-                  <LinkIcon size={16} />
-                  <span className="text-gray-500">{displayProfile.website}</span>
-                </div>
-              );
-            }
-          })()}
-        </div>
-
-        <div className="flex flex-wrap gap-2 mb-4">
-          <button
-            onClick={() => setShowQRModal(true)}
-            className="flex-1 min-w-[100px] flex items-center justify-center gap-2 px-3 py-2 bg-gray-100 dark:bg-gray-800 rounded-xl font-bold text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors whitespace-nowrap"
-          >
-            <QrCode size={18} />
-            <span>My QR Code</span>
-          </button>
-          <RouterLink
-            to="/chats"
-            state={{ tab: 'archived' }}
-            className="flex-1 min-w-[100px] flex items-center justify-center gap-2 px-3 py-2 bg-gray-100 dark:bg-gray-800 rounded-xl font-bold text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors whitespace-nowrap"
-          >
-            <Archive size={18} />
-            <span>Archived</span>
-          </RouterLink>
-
-          <RouterLink
-            to="/my-bag"
-            className="flex-1 min-w-[100px] flex items-center justify-center gap-2 px-3 py-2 bg-gray-100 dark:bg-gray-800 rounded-xl font-bold text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors whitespace-nowrap"
-          >
-            <Lock size={18} className="text-[#ff1744]" />
-            <span>My Bag</span>
-          </RouterLink>
-        </div>
-
-        <QRCodeModal isOpen={showQRModal} onClose={() => setShowQRModal(false)} />
-
-
-        <div className="flex gap-4 text-sm mb-4">
-          <div>
-            <span className="font-bold text-gray-900 dark:text-white">{(displayProfile as any).following_count || 0}</span>{' '}
-            <span className="text-gray-500 dark:text-gray-400">Following</span>
-          </div>
-          <div>
-            <span className="font-bold text-gray-900 dark:text-white">{(displayProfile as any).followers_count || 0}</span>{' '}
-            <span className="text-gray-500 dark:text-gray-400">Followers</span>
-          </div>
-        </div>
-
-        {/* Referral Points Card */}
-        <div className="mb-6 p-4 bg-gradient-to-br from-gray-50 to-gray-100 dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="font-bold text-gray-900 dark:text-white flex items-center gap-2">
-              <span className="text-yellow-500">✨</span> VoxPoints
-            </h3>
-            <div className="text-2xl font-black text-[#ff1744]">
-              {displayProfile.referral_count ? displayProfile.referral_count * 50 : 0}
-            </div>
-          </div>
-          <p className="text-sm text-gray-500 mb-4">
-            You have referred {displayProfile.referral_count || 0} friends. Keep inviting to unlock badges!
-          </p>
-
-          <div className="flex items-center gap-2 bg-white dark:bg-gray-900 p-2 rounded-xl border border-dashed border-gray-300">
-            <code className="flex-1 font-mono font-bold text-center text-gray-700 dark:text-gray-300">
-              {displayProfile.referral_code || 'NO CODE'}
-            </code>
-            <button
-              onClick={() => {
-                if (displayProfile.referral_code) {
-                  navigator.clipboard.writeText(displayProfile.referral_code);
-                  alert("Code copied!");
-                }
-              }}
-              className="px-3 py-1.5 bg-gray-900 text-white text-xs font-bold rounded-lg hover:bg-black transition-colors"
-            >
-              Copy
-            </button>
-          </div>
         </div>
       </div>
+
+      {/* Profile Info */}
+      <div className="px-4 pb-4 relative mt-12">
+        <div className="flex justify-between items-start mb-4">
+          <div className="flex-1 min-w-0 pr-4">
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white truncate">{displayProfile.full_name}</h1>
+            <p className="text-gray-500 dark:text-gray-400 text-sm">@{displayProfile.username}</p>
+          </div>
+        </div>
+        <p className="text-gray-900 dark:text-gray-100 mb-3 whitespace-pre-wrap">
+          {displayProfile.bio || "No bio yet."}
+        </p>
+
+        <div className="flex items-center gap-1">
+          <Calendar size={16} />
+          Joined {new Date(displayProfile.created_at).toLocaleDateString()}
+        </div>
+        {displayProfile.website && (() => {
+          try {
+            const url = new URL(displayProfile.website.includes('://') ? displayProfile.website : `https://${displayProfile.website}`);
+            return (
+              <div className="flex items-center gap-1 mt-1">
+                <LinkIcon size={16} />
+                <a href={url.toString()} target="_blank" rel="noopener noreferrer" className="text-[#ff1744] hover:underline">
+                  {url.hostname}
+                </a>
+              </div>
+            );
+          } catch {
+            return (
+              <div className="flex items-center gap-1 mt-1">
+                <LinkIcon size={16} />
+                <span className="text-gray-500">{displayProfile.website}</span>
+              </div>
+            );
+          }
+        })()}
+      </div>
+
+      <div className="flex flex-wrap gap-2 mb-4">
+        <button
+          onClick={() => setShowQRModal(true)}
+          className="flex-1 min-w-[100px] flex items-center justify-center gap-2 px-3 py-2 bg-gray-100 dark:bg-gray-800 rounded-xl font-bold text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors whitespace-nowrap"
+        >
+          <QrCode size={18} />
+          <span>My QR Code</span>
+        </button>
+        <RouterLink
+          to="/chats"
+          state={{ tab: 'archived' }}
+          className="flex-1 min-w-[100px] flex items-center justify-center gap-2 px-3 py-2 bg-gray-100 dark:bg-gray-800 rounded-xl font-bold text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors whitespace-nowrap"
+        >
+          <Archive size={18} />
+          <span>Archived</span>
+        </RouterLink>
+
+        <RouterLink
+          to="/my-bag"
+          className="flex-1 min-w-[100px] flex items-center justify-center gap-2 px-3 py-2 bg-gray-100 dark:bg-gray-800 rounded-xl font-bold text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors whitespace-nowrap"
+        >
+          <Lock size={18} className="text-[#ff1744]" />
+          <span>My Bag</span>
+        </RouterLink>
+      </div>
+
+      <QRCodeModal isOpen={showQRModal} onClose={() => setShowQRModal(false)} />
+
+
+      <div className="flex gap-4 text-sm mb-4">
+        <div>
+          <span className="font-bold text-gray-900 dark:text-white">{(displayProfile as any).following_count || 0}</span>{' '}
+          <span className="text-gray-500 dark:text-gray-400">Following</span>
+        </div>
+        <div>
+          <span className="font-bold text-gray-900 dark:text-white">{(displayProfile as any).followers_count || 0}</span>{' '}
+          <span className="text-gray-500 dark:text-gray-400">Followers</span>
+        </div>
+      </div>
+
+      {/* Referral Points Card */}
+      <div className="mb-6 p-4 bg-gradient-to-br from-gray-50 to-gray-100 dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700">
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="font-bold text-gray-900 dark:text-white flex items-center gap-2">
+            <span className="text-yellow-500">✨</span> VoxPoints
+          </h3>
+          <div className="text-2xl font-black text-[#ff1744]">
+            {displayProfile.referral_count ? displayProfile.referral_count * 50 : 0}
+          </div>
+        </div>
+        <p className="text-sm text-gray-500 mb-4">
+          You have referred {displayProfile.referral_count || 0} friends. Keep inviting to unlock badges!
+        </p>
+
+        <div className="flex items-center gap-2 bg-white dark:bg-gray-900 p-2 rounded-xl border border-dashed border-gray-300">
+          <code className="flex-1 font-mono font-bold text-center text-gray-700 dark:text-gray-300">
+            {displayProfile.referral_code || 'NO CODE'}
+          </code>
+          <button
+            onClick={() => {
+              if (displayProfile.referral_code) {
+                navigator.clipboard.writeText(displayProfile.referral_code);
+                alert("Code copied!");
+              }
+            }}
+            className="px-3 py-1.5 bg-gray-900 text-white text-xs font-bold rounded-lg hover:bg-black transition-colors"
+          >
+            Copy
+          </button>
+        </div>
+      </div>
+
 
 
       {/* Tabs */}
@@ -384,7 +392,7 @@ const ProfileView: React.FC = () => {
         onClose={() => setPreviewImage(null)}
         src={previewImage || ''}
       />
-    </div>
+    </div >
   );
 };
 
