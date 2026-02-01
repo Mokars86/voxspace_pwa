@@ -1,7 +1,23 @@
-Release Notes v1.2 (Build 5)
+Release Notes v1.3 (Build 6)
+===============================
 
-What's New:
-- 🎨 New App Icon & Branding: A fresh new look with our updated logo.
-- ⚡ Improved Feed: Posts now appear instantly with optimized realtime updates.
-- 👤 Profile Enhancements: Redesigned profile header and fixed settings navigation for a smoother experience.
-- 🐛 Bug Fixes & Performance Improvements: General stability updates and checking optimizations.
+New Features:
+-------------
+* **Space Tab Management:** Space Admins can now manage the visibility of tabs within their spaces.
+    * New "Space Settings" modal for owners.
+    * Ability to toggle: Chat, Voice, Events, Polls, Resources, and Media tabs.
+    * Settings persist across sessions for all members.
+
+UI Improvements & Fixes:
+------------------------
+* **Space Layout:** Fixed an issue where the "You own this space" indicator blocked the Settings button.
+    * Refined the visual style of the ownership indicator.
+    * Adjusted Z-index layering for better modal interaction.
+* **Dark Mode:** Improved readability of the "About this Space" section in dark mode.
+    * Updated text colors for better contrast.
+    * Added proper styling to the description editor.
+
+Technical:
+----------
+* Database schema updated to support `disabled_tabs` on Spaces table.
+* Android Version Code bumped to 6.

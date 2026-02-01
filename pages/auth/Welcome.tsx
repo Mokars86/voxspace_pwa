@@ -20,7 +20,7 @@ const Welcome: React.FC = () => {
     }, []);
 
     return (
-        <div className="flex flex-col h-screen bg-white relative overflow-hidden">
+        <div className="flex flex-col h-screen bg-background relative overflow-hidden">
             {/* Background blobs */}
             <div className="absolute top-[-20%] right-[-20%] w-[500px] h-[500px] bg-red-100/50 rounded-full blur-[100px]" />
             <div className="absolute bottom-[-20%] left-[-20%] w-[500px] h-[500px] bg-orange-100/50 rounded-full blur-[100px]" />
@@ -40,7 +40,7 @@ const Welcome: React.FC = () => {
                     animationStep >= 2 ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10"
                 )}>
                     <h1 className="text-4xl font-bold tracking-tight">
-                        <span className="text-black">Vox</span><span className="text-[#ff1744]">Space</span>
+                        <span className="text-black dark:text-white">Vox</span><span className="text-[#ff1744]">Space</span>
                     </h1>
                     <p className="text-xl text-gray-500 font-medium">
                         Voice of the People
@@ -54,7 +54,7 @@ const Welcome: React.FC = () => {
             )}>
                 <button
                     onClick={() => navigate('/login')}
-                    className="w-full py-4 text-white bg-gray-900 rounded-2xl font-semibold text-lg hover:scale-[1.02] active:scale-[0.98] transition-all shadow-lg shadow-gray-200"
+                    className="w-full py-4 text-white bg-gray-900 dark:bg-white dark:text-gray-900 rounded-2xl font-semibold text-lg hover:scale-[1.02] active:scale-[0.98] transition-all shadow-lg shadow-gray-200"
                 >
                     Get Started
                 </button>

@@ -161,19 +161,19 @@ const Login: React.FC = () => {
 
 
     return (
-        <div className="flex flex-col h-screen bg-white">
+        <div className="flex flex-col h-screen bg-background text-foreground">
             <header className="p-4">
                 <button
                     onClick={() => navigate(-1)}
-                    className="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center hover:bg-gray-100 transition-colors"
+                    className="w-10 h-10 rounded-full bg-gray-50 dark:bg-gray-800 flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                 >
-                    <ArrowLeft size={20} className="text-gray-900" />
+                    <ArrowLeft size={20} className="text-gray-900 dark:text-white" />
                 </button>
             </header>
 
             <main className="flex-1 p-8 flex flex-col justify-center">
                 <div className="mb-8">
-                    <h1 className="text-3xl font-bold text-gray-900 mb-2">
+                    <h1 className="text-3xl font-bold text-foreground mb-2">
                         {isSignUp ? "Create Account" : "Welcome Back"}
                     </h1>
                     <p className="text-gray-500">
@@ -189,7 +189,7 @@ const Login: React.FC = () => {
                             {/* Avatar Picker */}
                             <div className="flex justify-center mb-6">
                                 <div className="relative">
-                                    <div className="w-24 h-24 rounded-full bg-gray-100 flex items-center justify-center overflow-hidden border-4 border-white shadow-lg">
+                                    <div className="w-24 h-24 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center overflow-hidden border-4 border-white dark:border-gray-700 shadow-lg">
                                         {avatarPreview ? (
                                             <img src={avatarPreview} alt="Profile Preview" className="w-full h-full object-cover" />
                                         ) : (
@@ -208,9 +208,8 @@ const Login: React.FC = () => {
                                 </div>
                             </div>
 
-                            {/* Full Name */}
                             <div className="space-y-2">
-                                <label className="text-sm font-semibold text-gray-700 ml-1">Full Name</label>
+                                <label className="text-sm font-semibold text-gray-700 dark:text-gray-300 ml-1">Full Name</label>
                                 <div className="relative">
                                     <User className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
                                     <input
@@ -218,7 +217,7 @@ const Login: React.FC = () => {
                                         value={fullName}
                                         onChange={(e) => setFullName(e.target.value)}
                                         placeholder="John Doe"
-                                        className="w-full pl-12 pr-4 py-4 bg-gray-50 border-2 border-transparent focus:border-[#ff1744]/20 focus:bg-white rounded-2xl outline-none transition-all font-medium text-gray-900"
+                                        className="w-full pl-12 pr-4 py-4 bg-gray-50 dark:bg-gray-800 border-2 border-transparent focus:border-[#ff1744]/20 focus:bg-white dark:focus:bg-gray-900 rounded-2xl outline-none transition-all font-medium text-gray-900 dark:text-white placeholder:text-gray-400"
                                         required={isSignUp}
                                     />
                                 </div>
@@ -226,7 +225,7 @@ const Login: React.FC = () => {
 
                             {/* Username */}
                             <div className="space-y-2">
-                                <label className="text-sm font-semibold text-gray-700 ml-1">Username</label>
+                                <label className="text-sm font-semibold text-gray-700 dark:text-gray-300 ml-1">Username</label>
                                 <div className="relative">
                                     <AtSign className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
                                     <input
@@ -234,7 +233,7 @@ const Login: React.FC = () => {
                                         value={username}
                                         onChange={(e) => setUsername(e.target.value)}
                                         placeholder="johndoe"
-                                        className="w-full pl-12 pr-4 py-4 bg-gray-50 border-2 border-transparent focus:border-[#ff1744]/20 focus:bg-white rounded-2xl outline-none transition-all font-medium text-gray-900"
+                                        className="w-full pl-12 pr-4 py-4 bg-gray-50 dark:bg-gray-800 border-2 border-transparent focus:border-[#ff1744]/20 focus:bg-white dark:focus:bg-gray-900 rounded-2xl outline-none transition-all font-medium text-gray-900 dark:text-white placeholder:text-gray-400"
                                         required={isSignUp}
                                     />
                                 </div>
@@ -242,7 +241,7 @@ const Login: React.FC = () => {
 
                             {/* Referral Code */}
                             <div className="space-y-2">
-                                <label className="text-sm font-semibold text-gray-700 ml-1">Referral Code (Optional)</label>
+                                <label className="text-sm font-semibold text-gray-700 dark:text-gray-300 ml-1">Referral Code (Optional)</label>
                                 <div className="relative">
                                     <User className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
                                     <input
@@ -250,7 +249,7 @@ const Login: React.FC = () => {
                                         value={referralCode}
                                         onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
                                         placeholder="REFERRAL123"
-                                        className="w-full pl-12 pr-4 py-4 bg-gray-50 border-2 border-transparent focus:border-[#ff1744]/20 focus:bg-white rounded-2xl outline-none transition-all font-medium text-gray-900"
+                                        className="w-full pl-12 pr-4 py-4 bg-gray-50 dark:bg-gray-800 border-2 border-transparent focus:border-[#ff1744]/20 focus:bg-white dark:focus:bg-gray-900 rounded-2xl outline-none transition-all font-medium text-gray-900 dark:text-white placeholder:text-gray-400"
                                     />
                                 </div>
                             </div>
@@ -258,7 +257,7 @@ const Login: React.FC = () => {
                     )}
 
                     <div className="space-y-2">
-                        <label className="text-sm font-semibold text-gray-700 ml-1">Email Address</label>
+                        <label className="text-sm font-semibold text-gray-700 dark:text-gray-300 ml-1">Email Address</label>
                         <div className="relative">
                             <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
                             <input
@@ -266,22 +265,22 @@ const Login: React.FC = () => {
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
                                 placeholder="you@example.com"
-                                className="w-full pl-12 pr-4 py-4 bg-gray-50 border-2 border-transparent focus:border-[#ff1744]/20 focus:bg-white rounded-2xl outline-none transition-all font-medium text-gray-900"
+                                className="w-full pl-12 pr-4 py-4 bg-gray-50 dark:bg-gray-800 border-2 border-transparent focus:border-[#ff1744]/20 focus:bg-white dark:focus:bg-gray-900 rounded-2xl outline-none transition-all font-medium text-gray-900 dark:text-white placeholder:text-gray-400"
                                 required
                             />
                         </div>
                     </div>
 
                     <div className="space-y-2">
-                        <label className="text-sm font-semibold text-gray-700 ml-1">Password</label>
+                        <label className="text-sm font-semibold text-gray-700 dark:text-gray-300 ml-1">Password</label>
                         <div className="relative">
                             <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
                             <input
-                                type={showPassword ? "text" : "password"}
+                                type="password"
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
                                 placeholder="••••••••"
-                                className="w-full pl-12 pr-12 py-4 bg-gray-50 border-2 border-transparent focus:border-[#ff1744]/20 focus:bg-white rounded-2xl outline-none transition-all font-medium text-gray-900"
+                                className="w-full pl-12 pr-12 py-4 bg-gray-50 dark:bg-gray-800 border-2 border-transparent focus:border-[#ff1744]/20 focus:bg-white dark:focus:bg-gray-900 rounded-2xl outline-none transition-all font-medium text-gray-900 dark:text-white placeholder:text-gray-400"
                                 required
                                 minLength={6}
                             />

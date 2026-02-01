@@ -96,12 +96,12 @@ const Onboarding: React.FC = () => {
     };
 
     return (
-        <div className="flex flex-col h-screen bg-white overflow-y-auto">
+        <div className="flex flex-col h-screen bg-background text-foreground overflow-y-auto">
             <div className="flex-1 flex flex-col justify-center max-w-sm mx-auto w-full p-6 min-h-[600px]">
                 {/* Progress Bars */}
                 <div className="flex gap-2 mb-8">
                     {[1, 2, 3].map(i => (
-                        <div key={i} className={cn("h-1 flex-1 rounded-full transition-colors", step >= i ? "bg-[#ff1744]" : "bg-gray-100")} />
+                        <div key={i} className={cn("h-1 flex-1 rounded-full transition-colors", step >= i ? "bg-[#ff1744]" : "bg-gray-100 dark:bg-gray-800")} />
                     ))}
                 </div>
 
@@ -113,7 +113,7 @@ const Onboarding: React.FC = () => {
                         <div className="flex flex-col items-center mb-8">
                             <button
                                 onClick={() => fileInputRef.current?.click()}
-                                className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center text-gray-400 relative overflow-hidden active:scale-95 transition-transform"
+                                className="w-24 h-24 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center text-gray-400 relative overflow-hidden active:scale-95 transition-transform"
                                 disabled={uploading}
                             >
                                 {avatarUrl ? (
@@ -140,14 +140,14 @@ const Onboarding: React.FC = () => {
                                 placeholder="Display Name"
                                 value={displayName}
                                 onChange={e => setDisplayName(e.target.value)}
-                                className="w-full p-4 bg-gray-50 rounded-2xl border border-transparent focus:border-[#ff1744]/20 outline-none font-semibold text-gray-900"
+                                className="w-full p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl border border-transparent focus:border-[#ff1744]/20 outline-none font-semibold text-gray-900 dark:text-white placeholder:text-gray-400"
                             />
                             <input
                                 type="text"
                                 placeholder="@username"
                                 value={username}
                                 onChange={e => setUsername(e.target.value)}
-                                className="w-full p-4 bg-gray-50 rounded-2xl border border-transparent focus:border-[#ff1744]/20 outline-none font-semibold text-gray-900"
+                                className="w-full p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl border border-transparent focus:border-[#ff1744]/20 outline-none font-semibold text-gray-900 dark:text-white placeholder:text-gray-400"
                             />
                         </div>
                     </div>
@@ -173,7 +173,7 @@ const Onboarding: React.FC = () => {
                                         "px-4 py-2 rounded-full font-medium text-sm border transition-all",
                                         selectedInterests.includes(topic)
                                             ? "bg-[#ff1744] text-white border-[#ff1744]"
-                                            : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"
+                                            : "bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600"
                                     )}
                                 >
                                     {topic}
@@ -189,25 +189,25 @@ const Onboarding: React.FC = () => {
                         <p className="text-gray-500 mb-8">Control your privacy and notifications.</p>
 
                         <div className="space-y-4">
-                            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl">
+                            <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl">
                                 <div className="flex items-center gap-3">
-                                    <div className="p-2 bg-white rounded-xl shadow-sm"><Shield size={20} className="text-blue-500" /></div>
+                                    <div className="p-2 bg-white dark:bg-gray-700 rounded-xl shadow-sm"><Shield size={20} className="text-blue-500" /></div>
                                     <div className="text-left">
-                                        <p className="font-bold text-gray-900">Private Account</p>
-                                        <p className="text-xs text-gray-500">Only followers see your posts</p>
+                                        <p className="font-bold text-gray-900 dark:text-white">Private Account</p>
+                                        <p className="text-xs text-gray-500 dark:text-gray-400">Only followers see your posts</p>
                                     </div>
                                 </div>
-                                <div className="w-12 h-6 bg-gray-200 rounded-full relative">
+                                <div className="w-12 h-6 bg-gray-200 dark:bg-gray-700 rounded-full relative">
                                     <div className="absolute left-1 top-1 w-4 h-4 bg-white rounded-full shadow-sm" />
                                 </div>
                             </div>
 
-                            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl">
+                            <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl">
                                 <div className="flex items-center gap-3">
-                                    <div className="p-2 bg-white rounded-xl shadow-sm"><Bell size={20} className="text-orange-500" /></div>
+                                    <div className="p-2 bg-white dark:bg-gray-700 rounded-xl shadow-sm"><Bell size={20} className="text-orange-500" /></div>
                                     <div className="text-left">
-                                        <p className="font-bold text-gray-900">Notifications</p>
-                                        <p className="text-xs text-gray-500">Push notifications enabled</p>
+                                        <p className="font-bold text-gray-900 dark:text-white">Notifications</p>
+                                        <p className="text-xs text-gray-500 dark:text-gray-400">Push notifications enabled</p>
                                     </div>
                                 </div>
                                 <div className="w-12 h-6 bg-[#ff1744] rounded-full relative">
