@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Users, MessageSquare, Mic, Globe, Share2, MoreVertical, Loader2, Camera, Trash2, Calendar, Image as ImageIcon, Pin, X, StopCircle, Play, Pause, MapPin } from 'lucide-react';
+import { ArrowLeft, Users, MessageSquare, Mic, Globe, Share2, MoreVertical, Loader2, Camera, Trash2, Calendar, Image as ImageIcon, Pin, X, StopCircle, Play, Pause, MapPin, Settings, Check } from 'lucide-react';
 import { supabase } from '../../services/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { cn } from '../../lib/utils';
@@ -57,6 +57,8 @@ const SpaceDetail: React.FC = () => {
     const [newEvent, setNewEvent] = useState({ title: '', description: '', start_time: '', location: '' });
     const [viewingImage, setViewingImage] = useState<{ url: string, type: 'image' | 'video' } | null>(null);
     const [isSpacePinned, setIsSpacePinned] = useState(false);
+    const [showSettingsModal, setShowSettingsModal] = useState(false);
+    const [disabledTabs, setDisabledTabs] = useState<string[]>([]);
 
     // Refs
     const postFileInputRef = useRef<HTMLInputElement>(null);
@@ -275,6 +277,7 @@ const SpaceDetail: React.FC = () => {
                 setSpace(data);
                 setEditName(data.name);
                 setEditDescription(data.description);
+                setDisabledTabs(data.disabled_tabs || []);
 
                 // Check Membership if user is logged in
                 if (user) {
@@ -487,12 +490,18 @@ const SpaceDetail: React.FC = () => {
         try {
             const { error } = await supabase
                 .from('spaces')
-                .update({ name: editName, description: editDescription })
+                .update({
+                    name: editName,
+                    description: editDescription,
+                    disabled_tabs: disabledTabs
+                })
                 .eq('id', space.id);
 
             if (error) throw error;
-            setSpace({ ...space, name: editName, description: editDescription });
+            setSpace({ ...space, name: editName, description: editDescription, disabled_tabs: disabledTabs });
             setIsEditing(false);
+            setShowSettingsModal(false);
+            alert("Space settings updated!");
         } catch (error: any) {
             console.error("Error updating space:", error);
             alert("Failed to update space");
@@ -575,9 +584,14 @@ const SpaceDetail: React.FC = () => {
                             <Pin size={24} className={isSpacePinned ? "fill-current" : ""} />
                         </button>
                         {isOwner && (
-                            <button onClick={handleDelete} className="p-2 bg-red-500/80 backdrop-blur-md rounded-full hover:bg-red-600">
-                                <Trash2 size={24} />
-                            </button>
+                            <>
+                                <button onClick={() => setShowSettingsModal(true)} className="p-2 bg-black/20 backdrop-blur-md rounded-full hover:bg-black/40">
+                                    <Settings size={24} />
+                                </button>
+                                <button onClick={handleDelete} className="p-2 bg-red-500/80 backdrop-blur-md rounded-full hover:bg-red-600">
+                                    <Trash2 size={24} />
+                                </button>
+                            </>
                         )}
                     </div>
                 </div>
@@ -657,21 +671,83 @@ const SpaceDetail: React.FC = () => {
 
             {/* Tabs */}
             <div className="bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700 flex overflow-x-auto scrollbar-hide sticky top-0 z-10">
-                {['posts', 'chat', 'voice', 'events', 'polls', 'resources', 'media'].map((tab) => (
-                    <button
-                        key={tab}
-                        onClick={() => setActiveTab(tab as any)}
-                        className={cn(
-                            "flex-1 py-3 px-4 text-sm font-bold uppercase tracking-wide border-b-2 transition-colors whitespace-nowrap",
-                            activeTab === tab
-                                ? "border-[#ff1744] text-[#ff1744]"
-                                : "border-transparent text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white"
-                        )}
-                    >
-                        {tab}
-                    </button>
-                ))}
+                {['posts', 'chat', 'voice', 'events', 'polls', 'resources', 'media']
+                    .filter(tab => tab === 'posts' || !disabledTabs.includes(tab))
+                    .map((tab) => (
+                        <button
+                            key={tab}
+                            onClick={() => setActiveTab(tab as any)}
+                            className={cn(
+                                "flex-1 py-3 px-4 text-sm font-bold uppercase tracking-wide border-b-2 transition-colors whitespace-nowrap",
+                                activeTab === tab
+                                    ? "border-[#ff1744] text-[#ff1744]"
+                                    : "border-transparent text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white"
+                            )}
+                        >
+                            {tab}
+                        </button>
+                    ))}
             </div>
+
+            {/* Settings Modal */}
+            {showSettingsModal && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
+                    <div className="bg-white dark:bg-gray-800 rounded-2xl w-full max-w-md p-6 relative">
+                        <button
+                            onClick={() => setShowSettingsModal(false)}
+                            className="absolute top-4 right-4 p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full text-gray-500"
+                        >
+                            <X size={20} />
+                        </button>
+
+                        <h2 className="text-xl font-bold mb-6 text-gray-900 dark:text-white flex items-center gap-2">
+                            <Settings className="text-[#ff1744]" />
+                            Space Settings
+                        </h2>
+
+                        <div className="space-y-6">
+                            <div>
+                                <h3 className="font-semibold mb-3 text-gray-700 dark:text-gray-300">Manage Tab Visibility</h3>
+                                <p className="text-sm text-gray-500 mb-4">Uncheck tabs to hide them from members.</p>
+                                <div className="space-y-3">
+                                    {['chat', 'voice', 'events', 'polls', 'resources', 'media'].map(tab => (
+                                        <label key={tab} className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 dark:bg-gray-700/50 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+                                            <div className={cn(
+                                                "w-5 h-5 rounded border flex items-center justify-center transition-colors",
+                                                !disabledTabs.includes(tab)
+                                                    ? "bg-[#ff1744] border-[#ff1744]"
+                                                    : "border-gray-400 bg-transparent"
+                                            )}>
+                                                {!disabledTabs.includes(tab) && <Check size={14} className="text-white" />}
+                                            </div>
+                                            <input
+                                                type="checkbox"
+                                                className="hidden"
+                                                checked={!disabledTabs.includes(tab)}
+                                                onChange={(e) => {
+                                                    if (e.target.checked) {
+                                                        setDisabledTabs(prev => prev.filter(t => t !== tab));
+                                                    } else {
+                                                        setDisabledTabs(prev => [...prev, tab]);
+                                                    }
+                                                }}
+                                            />
+                                            <span className="capitalize font-medium text-gray-700 dark:text-gray-200">{tab}</span>
+                                        </label>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <button
+                                onClick={handleUpdateSpace}
+                                className="w-full py-3 bg-[#ff1744] hover:bg-red-600 text-white rounded-xl font-bold font-lg shadow-lg active:scale-95 transition-all"
+                            >
+                                Save Changes
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Content Body */}
             <div className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 pb-20">
@@ -680,15 +756,15 @@ const SpaceDetail: React.FC = () => {
                     <div className="p-4 space-y-4">
                         {/* Pinned / About */}
                         <div className="bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-sm">
-                            <h3 className="text-xs font-bold text-gray-400 uppercase mb-2">About this Space</h3>
+                            <h3 className="text-xs font-bold text-gray-500 dark:text-gray-300 uppercase mb-2">About this Space</h3>
                             {isEditing ? (
                                 <textarea
                                     value={editDescription}
                                     onChange={e => setEditDescription(e.target.value)}
-                                    className="w-full h-24 p-2 border rounded-lg text-sm focus:border-[#ff1744] outline-none"
+                                    className="w-full h-24 p-2 border rounded-lg text-sm focus:border-[#ff1744] outline-none bg-white dark:bg-gray-700 dark:text-white dark:border-gray-600"
                                 />
                             ) : (
-                                <p className="text-gray-700 dark:text-gray-300 text-sm leading-relaxed whitespace-pre-wrap">{space.description}</p>
+                                <p className="text-gray-700 dark:text-gray-200 text-sm leading-relaxed whitespace-pre-wrap">{space.description}</p>
                             )}
 
                             {/* Leaderboard Widget */}
@@ -921,9 +997,9 @@ const SpaceDetail: React.FC = () => {
             {/* Join / Leave (Floating if not in Chat tab) */}
             {
                 activeTab !== 'chat' && (
-                    <div className="absolute bottom-0 left-0 right-0 p-4 bg-white border-t z-50">
+                    <div className="absolute bottom-0 left-0 right-0 p-4 bg-white border-t z-40">
                         {isOwner ? (
-                            <button className="w-full py-3 bg-gray-100 text-gray-400 font-bold rounded-xl text-lg cursor-not-allowed">
+                            <button className="w-full py-2 bg-gray-50 text-gray-400 font-medium rounded-lg text-xs cursor-not-allowed uppercase tracking-wider">
                                 You own this space
                             </button>
                         ) : (

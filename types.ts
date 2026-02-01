@@ -82,11 +82,13 @@ export interface Space {
   id: string;
   name: string;
   description: string;
-  members: number;
+  members_count: number;
   isLive: boolean;
-  banner: string;
+  banner_url: string;
   speakers?: string[];
   isPinned?: boolean;
+  owner_id: string;
+  disabled_tabs?: string[];
 }
 
 export interface Comment {
