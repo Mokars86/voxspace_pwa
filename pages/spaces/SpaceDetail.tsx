@@ -56,6 +56,7 @@ const SpaceDetail: React.FC = () => {
     const [showEventModal, setShowEventModal] = useState(false);
     const [newEvent, setNewEvent] = useState({ title: '', description: '', start_time: '', location: '' });
     const [viewingImage, setViewingImage] = useState<{ url: string, type: 'image' | 'video' } | null>(null);
+    const [isSpacePinned, setIsSpacePinned] = useState(false);
 
     // Refs
     const postFileInputRef = useRef<HTMLInputElement>(null);
@@ -271,6 +272,10 @@ const SpaceDetail: React.FC = () => {
                 setEditName(data.name);
                 setEditDescription(data.description);
 
+                setSpace(data);
+                setEditName(data.name);
+                setEditDescription(data.description);
+
                 // Check Membership if user is logged in
                 if (user) {
                     const { data: memberData } = await supabase
@@ -289,6 +294,15 @@ const SpaceDetail: React.FC = () => {
                         setMemberStatus(null);
                         setMemberRole('guest');
                     }
+
+                    // Check if pinned
+                    const { data: pinData } = await supabase
+                        .from('pinned_spaces')
+                        .select('*')
+                        .eq('space_id', id)
+                        .eq('user_id', user.id)
+                        .single();
+                    setIsSpacePinned(!!pinData);
                 }
 
                 // Initial Fetch
@@ -506,6 +520,25 @@ const SpaceDetail: React.FC = () => {
         }
     };
 
+    const handlePinSpace = async () => {
+        if (!user || !space) return;
+        const newPinned = !isSpacePinned;
+        setIsSpacePinned(newPinned); // Optimistic
+
+        try {
+            if (newPinned) {
+                const { error } = await supabase.from('pinned_spaces').insert({ space_id: id, user_id: user.id });
+                if (error) throw error;
+            } else {
+                const { error } = await supabase.from('pinned_spaces').delete().eq('space_id', id).eq('user_id', user.id);
+                if (error) throw error;
+            }
+        } catch (error) {
+            console.error("Error pinning space:", error);
+            setIsSpacePinned(!newPinned); // Revert
+        }
+    };
+
     if (loading) {
         return (
             <div className="flex items-center justify-center h-screen bg-white">
@@ -537,6 +570,9 @@ const SpaceDetail: React.FC = () => {
                     <div className="flex gap-2">
                         <button onClick={handleShare} className="p-2 bg-black/20 backdrop-blur-md rounded-full hover:bg-black/40">
                             <Share2 size={24} />
+                        </button>
+                        <button onClick={handlePinSpace} className={cn("p-2 backdrop-blur-md rounded-full hover:bg-black/40 transition-colors", isSpacePinned ? "bg-primary text-white" : "bg-black/20 text-white")}>
+                            <Pin size={24} className={isSpacePinned ? "fill-current" : ""} />
                         </button>
                         {isOwner && (
                             <button onClick={handleDelete} className="p-2 bg-red-500/80 backdrop-blur-md rounded-full hover:bg-red-600">

@@ -1,0 +1,7 @@
+Release Notes v1.2 (Build 5)
+
+What's New:
+- 🎨 New App Icon & Branding: A fresh new look with our updated logo.
+- ⚡ Improved Feed: Posts now appear instantly with optimized realtime updates.
+- 👤 Profile Enhancements: Redesigned profile header and fixed settings navigation for a smoother experience.
+- 🐛 Bug Fixes & Performance Improvements: General stability updates and checking optimizations.

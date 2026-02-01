@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Hash, Mic, Globe, Search, Plus, Loader2 } from 'lucide-react';
+import { Users, Hash, Mic, Globe, Search, Plus, Loader2, Pin } from 'lucide-react';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../context/AuthContext';
 import { Space } from '../types';
@@ -11,6 +11,7 @@ const SpacesView: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [spaces, setSpaces] = useState<Space[]>([]);
+  const [pinnedSpaces, setPinnedSpaces] = useState<Space[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
 
@@ -60,6 +61,29 @@ const SpacesView: React.FC = () => {
       }));
 
       setSpaces(formattedSpaces);
+
+      // Fetch Pinned Spaces
+      if (user) {
+        const { data: pinnedData } = await supabase
+          .from('pinned_spaces')
+          .select('space_id, spaces:space_id(id, name, description, banner_url, members_count, is_live)')
+          .eq('user_id', user.id);
+
+        if (pinnedData) {
+          const formattedPinned = pinnedData
+            .filter((p: any) => p.spaces) // Ensure space exists
+            .map((p: any) => ({
+              id: p.spaces.id,
+              name: p.spaces.name,
+              description: p.spaces.description,
+              members: p.spaces.members_count || 0,
+              isLive: p.spaces.is_live,
+              banner: p.spaces.banner_url || 'https://images.unsplash.com/photo-1518770660439-4636190af475?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
+              isPinned: true
+            }));
+          setPinnedSpaces(formattedPinned);
+        }
+      }
 
     } catch (error) {
       console.error("Error fetching spaces", error);
@@ -133,6 +157,30 @@ const SpacesView: React.FC = () => {
             </div>
           </div>
         </section>
+
+        {/* Pinned Spaces */}
+        {pinnedSpaces.length > 0 && (
+          <section>
+            <div className="flex items-center gap-2 mb-3">
+              <Pin size={20} className="text-yellow-500 fill-yellow-500" />
+              <h3 className="font-bold text-lg text-foreground">Pinned Spaces</h3>
+            </div>
+            <div className="flex gap-3 overflow-x-auto pb-4 hide-scrollbar">
+              {pinnedSpaces.map(space => (
+                <div
+                  key={space.id}
+                  onClick={() => navigate(`/space/${space.id}`)}
+                  className="flex-shrink-0 w-32 relative aspect-square rounded-2xl overflow-hidden group cursor-pointer bg-gray-100"
+                >
+                  <img src={space.banner} alt={space.name} className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                  <div className="absolute inset-x-0 bottom-0 p-2 bg-gradient-to-t from-black/80 to-transparent">
+                    <h4 className="text-white font-bold text-xs leading-tight truncate">{space.name}</h4>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* Popular Spaces */}
         <section>

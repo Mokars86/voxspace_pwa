@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useTheme } from './context/ThemeContext';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 import Welcome from './pages/auth/Welcome';
 import Login from './pages/auth/Login';
 import MainApp from './pages/MainApp';
 import { Loader2 } from 'lucide-react';
 import { SplashScreen } from '@capacitor/splash-screen'; // Import Splash Screen
-
+import { App as CapacitorApp } from '@capacitor/app';
 import Onboarding from './pages/auth/Onboarding';
 import ChatRoom from './pages/chats/ChatRoom';
 import Settings from './pages/Settings';
@@ -21,8 +21,10 @@ import SecuritySettings from './pages/settings/SecuritySettings';
 import AppearanceSettings from './pages/settings/AppearanceSettings';
 import NotificationSettings from './pages/settings/NotificationSettings';
 import DataSettings from './pages/settings/DataSettings';
+import ChatSettings from './pages/settings/ChatSettings';
 import BlockedUsers from './pages/settings/BlockedUsers';
 import { CallProvider } from './context/CallContext';
+import { NotificationToast } from './components/NotificationToast';
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { session, profile, loading } = useAuth();
@@ -125,6 +127,8 @@ function App() {
   const { session, loading, user } = useAuth();
   usePushNotifications();
   const isOnline = useNetworkStatus();
+  const navigate = useNavigate();
+  const location = useLocation();
 
 
   React.useEffect(() => {
@@ -137,7 +141,7 @@ function App() {
     hideSplash();
   }, [loading]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     // Request Notification permission on app start to trigger Android 13+ prompt
     if ("Notification" in window) {
       Notification.requestPermission().then((permission) => {
@@ -147,6 +151,29 @@ function App() {
       });
     }
   }, []);
+
+  // Handle Hardware Back Button
+  useEffect(() => {
+    let backButtonListener: any;
+
+    const setupBackButton = async () => {
+      backButtonListener = await CapacitorApp.addListener('backButton', ({ canGoBack }) => {
+        if (location.pathname === '/login' || location.pathname === '/welcome' || location.pathname === '/') {
+          CapacitorApp.exitApp();
+        } else {
+          navigate(-1);
+        }
+      });
+    };
+
+    setupBackButton();
+
+    return () => {
+      if (backButtonListener) {
+        backButtonListener.remove();
+      }
+    };
+  }, [navigate, location.pathname]);
 
   return (
     <>
@@ -158,6 +185,7 @@ function App() {
           </div>
         </div>
       )}
+      <NotificationToast />
       <Routes>
         <Route path="/my-bag" element={<ProtectedRoute><MyBag /></ProtectedRoute>} />
         <Route path="/welcome" element={<Welcome />} />
@@ -178,6 +206,7 @@ function App() {
         <Route path="/settings/privacy/blocked" element={<ProtectedRoute><BlockedUsers /></ProtectedRoute>} />
         <Route path="/settings/security" element={<ProtectedRoute><SecuritySettings /></ProtectedRoute>} />
         <Route path="/settings/data" element={<ProtectedRoute><DataSettings /></ProtectedRoute>} />
+        <Route path="/settings/chats" element={<ProtectedRoute><ChatSettings /></ProtectedRoute>} />
         <Route path="/settings/appearance" element={<ProtectedRoute><AppearanceSettings /></ProtectedRoute>} />
         <Route path="/edit-profile" element={<ProtectedRoute><EditProfile /></ProtectedRoute>} />
         <Route path="/space/:id" element={<ProtectedRoute><SpaceDetail /></ProtectedRoute>} />

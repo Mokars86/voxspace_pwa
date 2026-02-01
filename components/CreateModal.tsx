@@ -75,15 +75,43 @@ const CreateModal: React.FC<CreateModalProps> = ({ onClose }) => {
       }
 
       // 2. Create Post
-      const { error } = await supabase.from('posts').insert({
+      const { data: newPostData, error } = await supabase.from('posts').insert({
         user_id: user.id,
         content: content,
         media_url: mediaUrl,
         media_type: selectedMedia?.type,
         poll_options: isPollMode ? pollOptions.filter(o => o.trim()).map(text => ({ text, count: 0 })) : undefined
-      });
+      }).select().single();
 
       if (error) throw error;
+
+      // Dispatch Custom Event for Feed Update
+      if (newPostData) {
+        const fullPost: any = {
+          id: newPostData.id,
+          author: {
+            id: user.id,
+            name: user.user_metadata?.full_name || 'Me',
+            username: user.user_metadata?.username || 'me',
+            avatar: user.user_metadata?.avatar_url || '',
+            isVerified: false,
+            badge_type: profile?.badge_type
+          },
+          content: newPostData.content,
+          timestamp: "Just now",
+          likes: 0,
+          comments: 0,
+          reposts: 0,
+          media: newPostData.media_url,
+          media_type: newPostData.media_type,
+          location: newPostData.location,
+          isLiked: false,
+          is_pinned: false,
+          poll_options: newPostData.poll_options
+        };
+
+        window.dispatchEvent(new CustomEvent('post_created', { detail: fullPost }));
+      }
 
       // Cleanup
       onClose();

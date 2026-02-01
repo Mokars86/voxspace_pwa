@@ -14,7 +14,7 @@ import ErrorBoundary from '../../components/ErrorBoundary';
 import { cn } from '../../lib/utils';
 import { generateVideoThumbnail } from '../../lib/videoUtils';
 import {
-    ArrowLeft, Phone, Video, MoreVertical, Loader2, Clock, Trash2, Pin, ChevronDown, User, Image as ImageIcon, Ban, ShieldAlert, Check, X
+    ArrowLeft, Phone, Video, MoreVertical, Loader2, Clock, Trash2, Pin, ChevronDown, User, Image as ImageIcon, Ban, ShieldAlert, Check, X, Printer
 } from 'lucide-react';
 
 import { useNotifications } from '../../context/NotificationContext';
@@ -886,6 +886,75 @@ const ChatRoom = () => {
         }
     };
 
+    const handleExportChat = () => {
+        if (!messages.length) {
+            alert("No messages to export.");
+            return;
+        }
+
+        const printWindow = window.open('', '_blank');
+        if (!printWindow) {
+            alert("Please allow popups to export chat.");
+            return;
+        }
+
+        const chatName = chatProfile?.full_name || "Chat Export";
+        const dateStr = new Date().toLocaleDateString();
+
+        const htmlContent = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Chat Export - ${chatName}</title>
+                <style>
+                    body { font-family: system-ui, -apple-system, sans-serif; line-height: 1.5; color: #333; padding: 20px; }
+                    .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #eee; padding-bottom: 20px; }
+                    .header h1 { margin: 0; font-size: 24px; }
+                    .header p { color: #666; margin: 5px 0 0; }
+                    .message { margin-bottom: 15px; page-break-inside: avoid; }
+                    .meta { font-size: 12px; color: #888; margin-bottom: 2px; }
+                    .sender { font-weight: bold; color: #000; }
+                    .bubble { background: #f5f5f5; padding: 8px 12px; border-radius: 8px; display: inline-block; max-width: 100%; }
+                    .bubble.me { background: #e3f2fd; }
+                    .media-placeholder { font-style: italic; color: #666; border: 1px dashed #ccc; padding: 5px 10px; border-radius: 4px; display: inline-block; }
+                    @media print {
+                        body { padding: 0; }
+                        .no-print { display: none; }
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="header">
+                    <h1>${chatName}</h1>
+                    <p>Exported on ${dateStr}</p>
+                    <p>${messages.length} messages</p>
+                </div>
+                <div class="messages">
+                    ${messages.map(msg => `
+                        <div class="message">
+                            <div class="meta">
+                                <span class="sender">${msg.sender === 'me' ? 'Me' : chatName}</span> • ${msg.time} • ${msg.createdAt ? new Date(msg.createdAt).toLocaleDateString() : ''}
+                            </div>
+                            ${msg.type === 'text'
+                ? `<div class="bubble ${msg.sender === 'me' ? 'me' : ''}">${msg.text}</div>`
+                : `<div class="media-placeholder">[${msg.type.toUpperCase()} - See attachment in app]</div>`
+            }
+                        </div>
+                    `).join('')}
+                </div>
+                <script>
+                    window.onload = () => { window.print(); };
+                </script>
+            </body>
+            </html>
+        `;
+
+        printWindow.document.write(htmlContent);
+        printWindow.document.close();
+        setIsMenuOpen(false);
+    };
+
+
     const handleSaveToBag = async (msg: ChatMessage) => {
         if (!user) return;
         try {
@@ -1079,6 +1148,12 @@ const ChatRoom = () => {
                                             className="w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center gap-3 text-sm text-gray-700 dark:text-gray-200"
                                         >
                                             <Clock size={16} /> Disappearing Messages
+                                        </button>
+                                        <button
+                                            onClick={handleExportChat}
+                                            className="w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center gap-3 text-sm text-gray-700 dark:text-gray-200"
+                                        >
+                                            <Printer size={16} /> Export Chat
                                         </button>
                                         <button
                                             onClick={() => { handleBlockUser(); }}

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, User, Shield, Bell, Moon, Globe, Database, Lock, LogOut, ChevronRight, Loader2 } from 'lucide-react';
+import { ArrowLeft, User, Shield, Bell, Moon, Globe, Database, Lock, LogOut, ChevronRight, Loader2, MessageSquare } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../services/supabase';
 import { useLanguage } from '../context/LanguageContext';
@@ -58,6 +58,9 @@ const Settings: React.FC = () => {
                     <SettingsSection title="Preferences">
                         <div onClick={() => navigate('/settings/notifications')}>
                             <SettingsItem icon={<Bell size={20} />} label={t('headers.notifications')} />
+                        </div>
+                        <div onClick={() => navigate('/settings/chats')}>
+                            <SettingsItem icon={<MessageSquare size={20} />} label="Chats" />
                         </div>
                         <div onClick={() => navigate('/settings/appearance')}>
                             <SettingsItem icon={<Moon size={20} />} label="Appearance" value="Mode" />

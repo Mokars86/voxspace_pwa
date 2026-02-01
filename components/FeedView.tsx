@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { PenLine, Image as ImageIcon, Video, Loader2, X, BarChart2, Plus, Minus, ChevronUp, ChevronDown } from 'lucide-react';
+import { Image as ImageIcon, Video, Loader2, X, BarChart2, Plus, ChevronUp, ChevronDown } from 'lucide-react';
 import PostCard from './PostCard';
 import StoryBar from './StoryBar';
 import ImageViewer from './ImageViewer';
@@ -341,6 +341,24 @@ const FeedView: React.FC = () => {
       supabase.removeChannel(channel);
     }
   }, [activeTab, user]);
+
+  // Listen for global post creation events (from CreateModal)
+  useEffect(() => {
+    const handleNewPost = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      const newPost = customEvent.detail as Post;
+      // Only add if not already present (Realtime might have caught it too)
+      setPosts(prev => {
+        if (prev.some(p => p.id === newPost.id)) return prev;
+        return [newPost, ...prev];
+      });
+    };
+
+    window.addEventListener('post_created', handleNewPost);
+    return () => {
+      window.removeEventListener('post_created', handleNewPost);
+    };
+  }, []);
 
   return (
     <div className="flex flex-col h-full bg-background transition-colors">

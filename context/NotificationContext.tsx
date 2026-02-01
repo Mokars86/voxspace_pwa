@@ -29,6 +29,8 @@ interface NotificationContextType {
     setPermissionStatus: (status: string) => void;
     activeChatId: string | null;
     setActiveChatId: (id: string | null) => void;
+    latestNotification: Notification | null;
+    setLatestNotification: (n: Notification | null) => void;
 }
 
 const NotificationContext = createContext<NotificationContextType>({
@@ -45,6 +47,8 @@ const NotificationContext = createContext<NotificationContextType>({
     permissionStatus: 'unknown',
     activeChatId: null,
     setActiveChatId: () => { },
+    latestNotification: null,
+    setLatestNotification: () => { },
 });
 
 export const NotificationProvider = ({ children }: { children: React.ReactNode }) => {
@@ -57,6 +61,7 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
     const [fcmToken, setFcmToken] = useState<string | null>(null);
     const [permissionStatus, setPermissionStatus] = useState<string>('unknown');
     const [activeChatId, setActiveChatId] = useState<string | null>(null);
+    const [latestNotification, setLatestNotification] = useState<Notification | null>(null);
 
     useEffect(() => {
         localStorage.setItem('sentMessageSound', sentMessageSound);
@@ -111,6 +116,7 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
                     }
 
                     setNotifications((prev) => [newNotif, ...prev]);
+                    setLatestNotification(newNotif);
 
                     if (shouldMarkRead) {
                         // Background sync to DB
@@ -212,7 +218,9 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
             permissionStatus,
             setPermissionStatus,
             activeChatId,
-            setActiveChatId
+            setActiveChatId,
+            latestNotification,
+            setLatestNotification
         }}>
             {children}
         </NotificationContext.Provider>

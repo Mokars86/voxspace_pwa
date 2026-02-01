@@ -26,6 +26,7 @@ export interface Post {
   is_pinned?: boolean;
   poll_options?: { text: string; count: number }[];
   user_vote?: number | null;
+  is_edited?: boolean;
 }
 
 export interface SpaceEvent {
@@ -85,6 +86,7 @@ export interface Space {
   isLive: boolean;
   banner: string;
   speakers?: string[];
+  isPinned?: boolean;
 }
 
 export interface Comment {
